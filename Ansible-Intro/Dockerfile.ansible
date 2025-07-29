@@ -22,6 +22,11 @@ RUN mkdir -p /etc/ansible /home/ansible/.ssh \
     && chown -R ansible:ansible /home/ansible \
     && chmod 700 /home/ansible/.ssh
 
+# Copy SSH private key for authentication to nodes
+COPY keys/ansible_key /home/ansible/.ssh/ansible_key
+RUN chown ansible:ansible /home/ansible/.ssh/ansible_key \
+    && chmod 600 /home/ansible/.ssh/ansible_key
+
 # Copy SSH config with security settings
 RUN echo "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile=/dev/null\n\tServerAliveInterval=60\n\tServerAliveCountMax=3" > /home/ansible/.ssh/config \
     && chown ansible:ansible /home/ansible/.ssh/config \

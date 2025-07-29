@@ -6,94 +6,55 @@ services:
     container_name: ansible_controller
     volumes:
       - ./ansible:/etc/ansible
-      # Use dedicated container key instead of host key
-      - ./keys/ansible_key:/home/ansible/.ssh/id_ed25519:ro
-      - ./keys/ansible_key.pub:/home/ansible/.ssh/id_ed25519.pub:ro
     networks:
       - ansible_net
     tty: true
-    # Enhanced security options
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
+    # Temporarily relaxed security for testing
+    # security_opt:
+    #   - no-new-privileges:true
+    # read_only: true
     tmpfs:
       - /tmp
       - /var/tmp
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_RAW
+    # cap_drop:
+    #   - ALL
     command: /bin/bash -c "tail -f /dev/null"
 
   node1:
-    image: ubuntu:22.04
+    build:
+      context: .
+      dockerfile: Dockerfile.node
     container_name: node1
-    # Create non-root user for Ansible
-    command: /bin/bash -c "
-      apt-get update &&
-      apt-get install -y openssh-server sudo &&
-      useradd -m -s /bin/bash ansible &&
-      echo 'ansible ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers &&
-      mkdir -p /home/ansible/.ssh &&
-      chmod 700 /home/ansible/.ssh &&
-      cp /tmp/authorized_keys /home/ansible/.ssh/authorized_keys &&
-      chmod 600 /home/ansible/.ssh/authorized_keys &&
-      chown -R ansible:ansible /home/ansible/.ssh &&
-      echo 'PermitRootLogin no' >> /etc/ssh/sshd_config &&
-      echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config &&
-      echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config &&
-      echo 'AllowUsers ansible' >> /etc/ssh/sshd_config &&
-      service ssh start &&
-      tail -f /dev/null"
     expose:
       - "22"
     networks:
       - ansible_net
-    volumes:
-      - ./keys/ansible_key.pub:/tmp/authorized_keys:ro
-    # Balanced security - allow necessary capabilities for setup
-    cap_drop:
-      - NET_RAW
-      - SYS_ADMIN
-    cap_add:
-      - SETUID
-      - SETGID
-      - DAC_OVERRIDE
+    # Temporarily relaxed security for testing
+    # security_opt:
+    #   - no-new-privileges:true
+    # cap_drop:
+    #   - ALL
+    # Only minimal capabilities needed for SSH
+    # cap_add:
+    #   - NET_BIND_SERVICE
 
   node2:
-    image: ubuntu:22.04
+    build:
+      context: .
+      dockerfile: Dockerfile.node
     container_name: node2
-    # Create non-root user for Ansible - same security as node1
-    command: /bin/bash -c "
-      apt-get update &&
-      apt-get install -y openssh-server sudo &&
-      useradd -m -s /bin/bash ansible &&
-      echo 'ansible ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers &&
-      mkdir -p /home/ansible/.ssh &&
-      chmod 700 /home/ansible/.ssh &&
-      cp /tmp/authorized_keys /home/ansible/.ssh/authorized_keys &&
-      chmod 600 /home/ansible/.ssh/authorized_keys &&
-      chown -R ansible:ansible /home/ansible/.ssh &&
-      echo 'PermitRootLogin no' >> /etc/ssh/sshd_config &&
-      echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config &&
-      echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config &&
-      echo 'AllowUsers ansible' >> /etc/ssh/sshd_config &&
-      service ssh start &&
-      tail -f /dev/null"
     expose:
       - "22"
     networks:
       - ansible_net
-    volumes:
-      - ./keys/ansible_key.pub:/tmp/authorized_keys:ro
-    # Balanced security - allow necessary capabilities for setup
-    cap_drop:
-      - NET_RAW
-      - SYS_ADMIN
-    cap_add:
-      - SETUID
-      - SETGID
-      - DAC_OVERRIDE
+    # Temporarily relaxed security for testing
+    # security_opt:
+    #   - no-new-privileges:true
+    # cap_drop:
+    #   - ALL
+    # Only minimal capabilities needed for SSH
+    # cap_add:
+    #   - NET_BIND_SERVICE
 
 networks:
   ansible_net:
