@@ -9,15 +9,9 @@ services:
     networks:
       - ansible_net
     tty: true
-    # Temporarily relaxed security for testing
-    # security_opt:
-    #   - no-new-privileges:true
-    # read_only: true
     tmpfs:
       - /tmp
       - /var/tmp
-    # cap_drop:
-    #   - ALL
     command: /bin/bash -c "tail -f /dev/null"
 
   node1:
@@ -29,14 +23,6 @@ services:
       - "22"
     networks:
       - ansible_net
-    # Temporarily relaxed security for testing
-    # security_opt:
-    #   - no-new-privileges:true
-    # cap_drop:
-    #   - ALL
-    # Only minimal capabilities needed for SSH
-    # cap_add:
-    #   - NET_BIND_SERVICE
 
   node2:
     build:
@@ -47,14 +33,6 @@ services:
       - "22"
     networks:
       - ansible_net
-    # Temporarily relaxed security for testing
-    # security_opt:
-    #   - no-new-privileges:true
-    # cap_drop:
-    #   - ALL
-    # Only minimal capabilities needed for SSH
-    # cap_add:
-    #   - NET_BIND_SERVICE
 
 networks:
   ansible_net:
