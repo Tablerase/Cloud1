@@ -1,0 +1,9 @@
+- name: MyFirstPlay
+  hosts: all
+  tasks:
+    - name: Ping all nodes
+      ansible.builtin.ping:
+
+    - name: Print message
+      ansible.builtin.debug:
+        msg: "Hello from {{ inventory_hostname }}"
