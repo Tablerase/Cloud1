@@ -1,4 +1,6 @@
 services:
+  #! Only for educational purposes controller shouldnt be in
+  # the same network/target as the nodes
   ansible-controller:
     build:
       context: .

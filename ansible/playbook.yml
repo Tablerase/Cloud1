@@ -7,3 +7,4 @@
     - name: Print message
       ansible.builtin.debug:
         msg: "Hello from {{ inventory_hostname }}"
+
