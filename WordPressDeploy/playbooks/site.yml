@@ -1,0 +1,7 @@
+- name: Deploy WordPress
+  hosts: all
+  become: true
+  roles:
+    - common
+    - docker
+    - wordpress

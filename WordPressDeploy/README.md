@@ -41,13 +41,16 @@ config:
   layout: dagre
 ---
 flowchart TB
-    WorldWideWeb@{ shape: dbl-circ, label: "World Wide Web" }
-    subgraph Cloud["Cloud Instance"]
+    WorldWideWeb@{ shape: dbl-circ, label: "🌐<br>World Wide<br>Web" }
+    subgraph ControlMachine["🖥️ Control Machine"]
+      subgraph AnsibleController["Ansible Controller"]
+        InvFile@{ shape: doc, label: "Inventory File" }
+        PLY@{ shape: doc, label: "Playbook Files" }
+      end
+    end
+    subgraph Cloud["☁️ Cloud Instance"]
+      sshAccess@{ shape: terminal, label: "SSH Access" }
       subgraph DockerEngine
-        subgraph AnsibleContainer["Ansible Container"]
-            InvFile@{ shape: doc, label: "Inventory File" }
-            PLY@{ shape: doc, label: "Playbook Files" }
-        end
         subgraph DatabaseContainer["Database Container"]
             DB@{ shape: database, label: "MySQL Database" }
         end
@@ -67,11 +70,12 @@ flowchart TB
     end
 
     WorldWideWeb w@-->|443/HTTPS| LB
-    AnsibleContainer alb@--> LB
-    AnsibleContainer aws1@--> WebServer1Container
-    AnsibleContainer aws2@--> WebServer2Container
-    AnsibleContainer adb@--> DatabaseContainer
-    AnsibleContainer apma@--> PMAContainer
+    AnsibleController assh@-->|22/SSH| sshAccess
+    sshAccess alb@--> LB
+    sshAccess aws1@--> WebServer1Container
+    sshAccess aws2@--> WebServer2Container
+    sshAccess adb@--> DatabaseContainer
+    sshAccess apma@--> PMAContainer
     LB lb1@-->|Routes Traffic| WP1
     LB lb2@-->|Routes Traffic| WP2
     WP1 --> DB
@@ -88,11 +92,11 @@ flowchart TB
     classDef ansible-anim stroke-dasharray: 5,5, stroke-dashoffset: 300, stroke-width: 2, stroke: #e0b25cff, animation: dash 25s linear infinite;
 
     class lb1,lb2,w web-anim
-    class alb,aws1,aws2,adb,apma ansible-anim
+    class assh,alb,aws1,aws2,adb,apma ansible-anim
     class InvFile,PLY files
     class DB,PMA database
     class LB,WP1,WP2,WorldWideWeb web
-    class AnsibleContainer ansible
+    class AnsibleController ansible
     class WebServer1Container,WebServer2Container,LoadBalancerContainer webContainer
     class DockerEngine docker
 ```
@@ -142,7 +146,9 @@ Ansible operates on a control node that manages one or more managed nodes. The c
 
 Inventories allow you to define the managed nodes and their connection details. Ansible uses these inventories to know which nodes to target for configuration management.
 
-### Example Inventory
+Roles are a way to organize playbooks and tasks into reusable components. They can be shared and reused across different projects.
+
+#### Example Inventory
 
 ```yaml
 all:
@@ -169,4 +175,61 @@ Playbooks are YAML files that define the tasks to be executed on the managed nod
     - name: Print message
       ansible.builtin.debug:
         msg: "Hello from {{ inventory_hostname }}"
+```
+
+Become is used to run tasks with elevated privileges, such as root access. This is often necessary for tasks that require administrative permissions. You can specify the user to become with the `become_user` directive, like so:
+
+```yaml
+- name: Install a package with sudo
+  ansible.builtin.yum:
+    name: httpd
+    state: present
+  become: true
+  become_user: root
+```
+
+### Templates
+
+Ansible supports Jinja2 templating, allowing you to create dynamic configurations based on variables and facts collected from the managed nodes. This is useful for generating configuration files or scripts that need to be customized for each node.
+
+### Modules
+
+Ansible modules are the building blocks of Ansible tasks. They are reusable scripts that perform specific actions on the managed nodes, such as installing packages, managing files, or executing commands.
+
+[Ansible Docker Compose Module](https://docs.ansible.com/ansible/latest/collections/community/docker/docker_compose_v2_module.html#ansible-collections-community-docker-docker-compose-v2-module)
+
+### Parallel Execution
+
+Ansible can execute tasks in parallel across multiple managed nodes, making it efficient for large-scale deployments. This is achieved through the use of SSH connections and the ability to run tasks concurrently.
+
+[Ansible Parallelism](https://thelinuxcode.com/ansible-parallelism/)
+
+## Multipass
+
+Multipass is a lightweight VM manager that allows you to create and manage virtual machines easily. It is particularly useful for testing and development environments.
+
+### Usage
+
+To create a new VM with Multipass, you can use the following command:
+
+```bash
+multipass launch --name my-vm
+```
+
+To list all running VMs, use:
+
+```bash
+multipass list
+```
+
+To access a specific VM, you can use:
+
+```bash
+multipass shell my-vm
+```
+
+To delete a VM, use:
+
+```bash
+multipass delete my-vm
 ```

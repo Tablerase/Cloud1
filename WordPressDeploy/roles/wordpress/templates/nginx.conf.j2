@@ -1,0 +1,35 @@
+server {
+    listen {{ nginx_port }};
+    server_name _;
+    index index.php index.html index.htm;
+
+    # WordPress configuration
+    location /wordpress/ {
+        alias /var/www/html/;
+        try_files $uri $uri/ /wordpress/index.php?$args;
+
+        location ~ \.php$ {
+            fastcgi_pass {{ wordpress_container_name }}:{{ wordpress_port }};
+            fastcgi_index index.php;
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $request_filename;
+        }
+    }
+
+    # phpMyAdmin configuration
+    location /myadmin/ {
+        alias /usr/share/phpmyadmin/;
+        try_files $uri $uri/ /myadmin/index.php?$args;
+
+        location ~ \.php$ {
+            fastcgi_pass {{ phpmyadmin_container_name }}:{{ phpmyadmin_port }};
+            fastcgi_index index.php;
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $request_filename;
+        }
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}

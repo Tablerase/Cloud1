@@ -1,0 +1,20 @@
+project_name: cloud1_project
+project_domain: example.com
+project_user: cloud1
+docker_compose_path: /opt/cloud1_project
+
+mysql_root_password: secure_password
+mysql_database: my_database
+mysql_user: wp_user
+mysql_password: secure_password
+mysql_port: 3306
+mysql_container_name: mysql_container
+
+wordpress_container_name: wordpress_container
+wordpress_port: 8080
+
+phpmyadmin_container_name: phpmyadmin_container
+phpmyadmin_port: 8081
+
+nginx_container_name: nginx_container
+nginx_port: 80

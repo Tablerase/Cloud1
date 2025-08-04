@@ -1,0 +1,11 @@
+# Create a env with
+## python3 -m venv .venv
+# Activate it with
+## source .venv/bin/activate
+# Then install the requirements with
+## pip install -r requirements.txt
+
+ansible
+ansible-lint
+docker
+requests
