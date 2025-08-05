@@ -25,15 +25,6 @@
     - wordpress
     - templates
 
-- name: Log Docker Compose file copy
-  ansible.builtin.debug:
-    msg: |
-      Docker Compose file copy:
-      - Destination: {{ docker_compose_path }}/docker-compose.yml
-      - Changed: {{ wordpress_compose_file_result.changed }}
-      - Checksum: {{ wordpress_compose_file_result.checksum | default('Not available') }}
-    verbosity: 1
-
 - name: Copy Nginx configuration file
   ansible.builtin.template:
     src: nginx.conf.j2
@@ -58,35 +49,3 @@
   tags:
     - wordpress
     - docker-compose
-
-- name: Log Docker Compose startup result
-  ansible.builtin.debug:
-    msg: |
-      Docker Compose startup:
-      - Changed: {{ wordpress_compose_up_result.changed }}
-      - Services: {{ wordpress_compose_up_result.services | default({}) | length }} services managed
-      - Actions: {{ wordpress_compose_up_result.actions | default([]) }}
-    verbosity: 1
-
-- name: Verify WordPress containers are running
-  ansible.builtin.command: >
-    docker ps --filter "name={{ docker_compose_path | basename }}"
-    --format "table {% raw %}{{.Names}}\t{{.Status}}\t{{.Ports}}{% endraw %}"
-  register: wordpress_container_status_check
-  changed_when: false
-  failed_when: false
-  become: true
-  become_user: "{{ project_user }}"
-  tags:
-    - wordpress
-    - verification
-
-- name: Log container status
-  ansible.builtin.debug:
-    msg: |
-      Container status check:
-      {{ wordpress_container_status_check.stdout | default('No containers found') }}
-
-- name: Log completion of wordpress role tasks
-  ansible.builtin.debug:
-    msg: "WordPress role tasks completed successfully at {{ ansible_date_time.iso8601 }}"

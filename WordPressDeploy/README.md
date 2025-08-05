@@ -188,6 +188,10 @@ Become is used to run tasks with elevated privileges, such as root access. This 
   become_user: root
 ```
 
+#### Roles
+
+[Ansible Roles](https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_reuse_roles.html) are a way to organize playbooks and tasks into reusable components. They allow you to group related tasks, variables, and files together, making it easier to manage complex configurations.
+
 ### Templates
 
 Ansible supports Jinja2 templating, allowing you to create dynamic configurations based on variables and facts collected from the managed nodes. This is useful for generating configuration files or scripts that need to be customized for each node.
@@ -196,7 +200,7 @@ Ansible supports Jinja2 templating, allowing you to create dynamic configuration
 
 Ansible modules are the building blocks of Ansible tasks. They are reusable scripts that perform specific actions on the managed nodes, such as installing packages, managing files, or executing commands.
 
-[Ansible Docker Compose Module](https://docs.ansible.com/ansible/latest/collections/community/docker/docker_compose_v2_module.html#ansible-collections-community-docker-docker-compose-v2-module)
+[Ansible Docker Compose Module](https://docs.ansible.com/ansible/latest/collections/community/docker/docker_compose_v2_module.html)
 
 ### Parallel Execution
 

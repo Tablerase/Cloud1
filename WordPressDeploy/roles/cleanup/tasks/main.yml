@@ -1,0 +1,11 @@
+- name: Stop WordPress Docker Compose services
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_compose_path }}"
+    state: absent
+    remove_volumes: true
+    remove_images: all
+  become: true
+  become_user: "{{ project_user }}"
+  register: cleanup_wordpress_compose_down_result
+  tags:
+    - cleanup
