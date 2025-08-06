@@ -28,15 +28,6 @@ services:
         image: wordpress:6
         container_name: {{ wordpress_container_name }}
         restart: always
-        environment:
-            WORDPRESS_DB_HOST: mysql
-            WORDPRESS_DB_USER: {{ mysql_user }}
-            WORDPRESS_DB_PASSWORD: {{ mysql_password }}
-            WORDPRESS_DB_NAME: {{ mysql_database }}
-            WORDPRESS_DEBUG: "true" # Set to "false" in production
-            WORDPRESS_CONFIG_EXTRA: |
-                define('WP_HOME', 'http://{{ project_domain }}/wordpress');
-                define('WP_SITEURL', 'http://{{ project_domain }}/wordpress');
         networks:
             - cloud1_network
         expose:
@@ -46,10 +37,18 @@ services:
                 condition: service_healthy
                 restart: true
         volumes:
-            - wordpress_data:/var/www/html
+            - wordpress_data:/var/www/html/
             - ./logs/wordpress/wordpress:/var/log/wordpress # Optional: for logging
             - ./logs/wordpress/apache2:/var/log/apache2 # Optional: for logging
-    
+        environment:
+            WORDPRESS_DB_HOST: mysql:{{ mysql_port }}
+            WORDPRESS_DB_USER: {{ mysql_user }}
+            WORDPRESS_DB_PASSWORD: {{ mysql_password }}
+            WORDPRESS_DB_NAME: {{ mysql_database }}
+            WORDPRESS_CONFIG_EXTRA: |
+                define( 'WP_HOME', 'http://{{ project_domain }}/wordpress' );
+                define( 'WP_SITEURL', 'http://{{ project_domain }}/wordpress' );
+
     # phpMyAdmin doc: https://hub.docker.com/_/phpmyadmin
     phpmyadmin:
         image: phpmyadmin:5
@@ -78,7 +77,8 @@ services:
         ports:
             - "{{ nginx_port }}:80"
         volumes:
-            - ./nginx.conf:/etc/nginx/nginx.conf:ro
+            # - ./nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./nginx.conf:/etc/nginx/nginx.conf
             - ./logs/nginx:/var/log/nginx 
         depends_on:
             - wordpress

@@ -49,3 +49,240 @@
   tags:
     - wordpress
     - docker-compose
+
+- name: Wait for MySQL container to be healthy
+  community.docker.docker_container:
+    name: "{{ mysql_container_name }}"
+    state: started
+    healthy_wait_timeout: 300 # Wait up to 5 minutes for MySQL to be healthy
+  become: true
+  become_user: "{{ project_user }}"
+  register: wordpress_mysql_health_check
+  tags:
+    - wordpress
+    - mysql
+    - health-check
+
+- name: Check if WordPress subdirectory exists
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: bash -c 'if [ -d /var/www/html/wordpress ]; then echo "exists"; else echo "not_exists"; fi'
+    user: www-data
+  register: wordpress_subdir_check
+  failed_when: false
+  changed_when: false
+  become: true
+  tags:
+    - wordpress
+    - wp-cli
+    - check
+
+- name: Create WordPress subdirectory
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: bash -lc 'mkdir -p /var/www/html/wordpress'
+    user: www-data
+  when: wordpress_subdir_check.stdout == "not_exists"
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - create
+
+- name: Move WordPress files into subdirectory
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: bash -lc 'mv /var/www/html/* /var/www/html/wordpress/'
+    user: www-data
+  when: wordpress_subdir_check.stdout == "not_exists"
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - move
+
+- name: Fix permissions on subdirectory
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: bash -lc 'chown -R www-data:www-data /var/www/html/wordpress && chown -R apache:apache /var/www/html/wordpress'
+    user: "www-data"
+  when: wordpress_subdir_check.stdout == "not_exists"
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - permissions
+
+- name: Check if WP-CLI is already installed
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: wp --version
+    user: "www-data"
+  register: wordpress_cli_check
+  failed_when: false
+  changed_when: false
+  become: true
+  tags:
+    - wordpress
+    - wp-cli
+    - check
+
+- name: Install WP-CLI inside WordPress container
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+  when: wordpress_cli_check.rc != 0
+  tags:
+    - wordpress
+    - wp-cli
+    - install
+
+- name: Make WP-CLI executable
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: chmod +x wp-cli.phar
+  when: wordpress_cli_check.rc != 0
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - install
+
+- name: Move WP-CLI to PATH
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: mv wp-cli.phar /usr/local/bin/wp
+  when: wordpress_cli_check.rc != 0
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - install
+
+# WP-CLI Config: https://developer.wordpress.org/cli/commands/config/create/
+- name: Generate Wordpress configuration file
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp config create
+        --dbname={{ mysql_database }}
+        --dbuser={{ mysql_user }}
+        --dbpass={{ mysql_password }}
+        --dbhost=mysql
+        --path=/var/www/html/wordpress
+        --force
+    user: "www-data"
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - config
+
+- name: Install WordPress
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp core install
+        --url=http://{{ project_domain }}/wordpress
+        --title="{{ project_name }}"
+        --admin_user={{ wordpress_admin_user }}
+        --admin_password={{ wordpress_admin_password }}
+        --admin_email={{ wordpress_admin_email }}
+        --path=/var/www/html/wordpress
+    user: "www-data"
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - install
+
+# /wordpress subdirectory setup : https://developer.wordpress.org/advanced-administration/server/wordpress-in-directory/
+- name: Update WordPress URLs to subdirectory
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc
+        'wp option update home http://{{ project_domain }}/wordpress --path=/var/www/html/wordpress &&
+        wp option update siteurl http://{{ project_domain }}/wordpress --path=/var/www/html/wordpress'
+    user: "www-data"
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - subdirectory
+
+- name: Add .htaccess for subdirectory rewrite
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: |
+      bash -lc 'cat > /var/www/html/.htaccess <<EOF
+      <IfModule mod_rewrite.c>
+      RewriteEngine on
+      RewriteCond %{HTTP_HOST} ^(www\.)?{{ project_domain }}$
+      RewriteCond %{REQUEST_URI} !^/wordpress/
+      RewriteCond %{REQUEST_FILENAME} !-f
+      RewriteCond %{REQUEST_FILENAME} !-d
+      RewriteRule ^(.*)$ /wordpress/$1 [L]
+      RewriteCond %{HTTP_HOST} ^(www\.)?{{ project_domain }}$
+      RewriteRule ^(/)?$ wordpress/index.php [L]
+      </IfModule>
+      EOF
+      '
+    user: "www-data"
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - htaccess
+
+- name: Copy index.php to web-root and point to /wordpress
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc '
+        cp /var/www/html/wordpress/index.php /var/www/html/index.php &&
+        sed -i "s|require( dirname( __FILE__ ) . \'/wp-blog-header.php\' );|require __DIR__ . \'/wordpress/wp-blog-header.php\';|" /var/www/html/index.php
+      '
+    user: www-data
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - subdirectory
+    - htaccess
+
+- name: Copy WP-generated .htaccess to web-root
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: bash -lc 'cp /var/www/html/wordpress/.htaccess /var/www/html/.htaccess'
+    user: www-data
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - subdirectory
+    - htaccess
+
+- name: Update siteurl & home to root URL
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc '
+        wp option update home http://{{ project_domain }} --path=/var/www/html/wordpress &&
+        wp option update siteurl http://{{ project_domain }} --path=/var/www/html/wordpress
+      '
+    user: www-data
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - subdirectory

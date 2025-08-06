@@ -2,6 +2,7 @@
 
 *.retry
 *.log
+.ansible
 
 # Ignore Ansible Vault files
 *.vault

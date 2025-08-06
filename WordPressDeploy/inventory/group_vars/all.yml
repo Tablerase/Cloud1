@@ -10,6 +10,9 @@ mysql_password: secure_password
 mysql_port: 3306
 mysql_container_name: mysql_container
 
+wordpress_admin_user: admin
+wordpress_admin_password: secure_password
+wordpress_admin_email: admin@cloud1.local
 wordpress_container_name: wordpress_container
 wordpress_port: 80
 

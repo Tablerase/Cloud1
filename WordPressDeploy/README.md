@@ -57,30 +57,25 @@ flowchart TB
         subgraph PMAContainer["PHPMyAdmin Container"]
             PMA@{ shape: terminal, label: "PHPMyAdmin" }
         end
-        subgraph LoadBalancerContainer["Load Balancer Container"]
-            LB@{ shape: procs, label: "Load Balancer<br>Nginx" }
+        subgraph ReverseProxyContainer["Reverse Proxy Container"]
+            RVP@{ shape: procs, label: "Reverse Proxy<br>Nginx" }
         end
         subgraph WebServer1Container["Web Server 1 Container"]
             WP1@{ shape: loop-limit, label: "Apache WordPress Application" }
         end
-        subgraph WebServer2Container["Web Server 2 Container"]
-            WP2@{ shape: loop-limit, label: "Apache WordPress Application" }
-        end
       end
     end
 
-    WorldWideWeb w@-->|443/HTTPS| LB
+    WorldWideWeb w@-->|443/HTTPS| RVP
     AnsibleController assh@-->|22/SSH| sshAccess
-    sshAccess alb@--> LB
+    sshAccess arvp@--> ReverseProxyContainer
     sshAccess aws1@--> WebServer1Container
-    sshAccess aws2@--> WebServer2Container
     sshAccess adb@--> DatabaseContainer
     sshAccess apma@--> PMAContainer
-    LB lb1@-->|Routes Traffic| WP1
-    LB lb2@-->|Routes Traffic| WP2
-    WP1 --> DB
-    WP2 --> DB
-    PMA --> DB
+    RVP rvp1@-->|/wordpress<br>80| WP1
+    RVP rvp2@-->|/myadmin<br>8081| PMA
+    WP1 -->|3306| DB
+    PMA -->|3306| DB
 
     classDef files fill: #fadc89ff,color: #616161ff,stroke: #b4befe
     classDef database fill: #7575bdff,color: #ffffffff,stroke: #45475a
@@ -91,13 +86,13 @@ flowchart TB
     classDef web-anim stroke-dasharray: 9,5, stroke-dashoffset: 900, stroke-width: 2, stroke: #489e5dff, animation: dash 25s linear infinite;
     classDef ansible-anim stroke-dasharray: 5,5, stroke-dashoffset: 300, stroke-width: 2, stroke: #e0b25cff, animation: dash 25s linear infinite;
 
-    class lb1,lb2,w web-anim
-    class assh,alb,aws1,aws2,adb,apma ansible-anim
+    class rvp1,rvp2,w web-anim
+    class assh,arvp,aws1,adb,apma ansible-anim
     class InvFile,PLY files
     class DB,PMA database
-    class LB,WP1,WP2,WorldWideWeb web
+    class RVP,WP1,WP2,WorldWideWeb web
     class AnsibleController ansible
-    class WebServer1Container,WebServer2Container,LoadBalancerContainer webContainer
+    class WebServer1Container,WebServer2Container,ReverseProxyContainer webContainer
     class DockerEngine docker
 ```
 
@@ -186,6 +181,30 @@ Become is used to run tasks with elevated privileges, such as root access. This 
     state: present
   become: true
   become_user: root
+```
+
+#### Tags
+
+Tags allow you to run specific parts of a playbook without executing the entire playbook. This is useful for testing or when you only want to apply certain changes.
+
+```yaml
+- name: Install a package
+  ansible.builtin.yum:
+    name: httpd
+    state: present
+  tags: install
+
+- name: another task
+  ansible.builtin.debug:
+    msg: "This is another task"
+  tags: other
+```
+
+When running the playbook, you can specify the tag to execute only that part:
+
+```bash
+ansible-playbook playbook.yml --tags install
+# Will only run tasks with the 'install' tag, skipping others.
 ```
 
 #### Roles
