@@ -77,23 +77,15 @@
     - wp-cli
     - check
 
-- name: Create WordPress subdirectory
+- name: Move WordPress files to subdirectory
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
-    command: bash -lc 'mkdir -p /var/www/html/wordpress'
-    user: www-data
-  when: wordpress_subdir_check.stdout == "not_exists"
-  become: true
-  become_user: "{{ project_user }}"
-  tags:
-    - wordpress
-    - wp-cli
-    - create
-
-- name: Move WordPress files into subdirectory
-  community.docker.docker_container_exec:
-    container: "{{ wordpress_container_name }}"
-    command: bash -lc 'mv /var/www/html/* /var/www/html/wordpress/'
+    command: >
+      bash -O extglob -O dotglob -lc '
+        mkdir -p /var/www/html/wordpress &&
+        shopt -s extglob dotglob &&
+        mv /var/www/html/!(wordpress) /var/www/html/wordpress/
+      '
     user: www-data
   when: wordpress_subdir_check.stdout == "not_exists"
   become: true
@@ -106,7 +98,7 @@
 - name: Fix permissions on subdirectory
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
-    command: bash -lc 'chown -R www-data:www-data /var/www/html/wordpress && chown -R apache:apache /var/www/html/wordpress'
+    command: bash -lc 'chown -R www-data:www-data /var/www/html/wordpress'
     user: "www-data"
   when: wordpress_subdir_check.stdout == "not_exists"
   become: true
@@ -242,47 +234,3 @@
   tags:
     - wordpress
     - htaccess
-
-- name: Copy index.php to web-root and point to /wordpress
-  community.docker.docker_container_exec:
-    container: "{{ wordpress_container_name }}"
-    command: >
-      bash -lc '
-        cp /var/www/html/wordpress/index.php /var/www/html/index.php &&
-        sed -i "s|require( dirname( __FILE__ ) . \'/wp-blog-header.php\' );|require __DIR__ . \'/wordpress/wp-blog-header.php\';|" /var/www/html/index.php
-      '
-    user: www-data
-  become: true
-  become_user: "{{ project_user }}"
-  tags:
-    - wordpress
-    - subdirectory
-    - htaccess
-
-- name: Copy WP-generated .htaccess to web-root
-  community.docker.docker_container_exec:
-    container: "{{ wordpress_container_name }}"
-    command: bash -lc 'cp /var/www/html/wordpress/.htaccess /var/www/html/.htaccess'
-    user: www-data
-  become: true
-  become_user: "{{ project_user }}"
-  tags:
-    - wordpress
-    - subdirectory
-    - htaccess
-
-- name: Update siteurl & home to root URL
-  community.docker.docker_container_exec:
-    container: "{{ wordpress_container_name }}"
-    command: >
-      bash -lc '
-        wp option update home http://{{ project_domain }} --path=/var/www/html/wordpress &&
-        wp option update siteurl http://{{ project_domain }} --path=/var/www/html/wordpress
-      '
-    user: www-data
-  become: true
-  become_user: "{{ project_user }}"
-  tags:
-    - wordpress
-    - wp-cli
-    - subdirectory
