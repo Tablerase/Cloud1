@@ -24,13 +24,6 @@
     state: present
   become: true
 
-- name: Ensure Docker service is running
-  ansible.builtin.service:
-    name: docker
-    state: started
-    enabled: true
-  become: true
-
 - name: Add project user to docker group
   ansible.builtin.user:
     name: "{{ project_user }}"
@@ -42,99 +35,12 @@
     - docker
     - security
 
-- name: Create Docker configuration directory for project user
-  ansible.builtin.file:
-    path: "/home/{{ project_user }}/.docker"
-    state: directory
-    owner: "{{ project_user }}"
-    group: "{{ project_user }}"
-    mode: "0700"
-  become: true
-  tags:
-    - docker
-    - security
-
-- name: Enable Docker service
+- name: Ensure Docker service is started and enabled
   ansible.builtin.service:
     name: docker
-    enabled: true
     state: started
+    enabled: true
   become: true
-  register: docker_enable_result
   tags:
     - docker
     - services
-
-- name: Create project directory with correct ownership
-  ansible.builtin.file:
-    path: "{{ docker_compose_path }}"
-    state: directory
-    owner: "{{ project_user }}"
-    group: "{{ project_user }}"
-    mode: "0755"
-  become: true
-  tags:
-    - docker
-    - security
-
-- name: Set up Docker daemon configuration for security
-  ansible.builtin.copy:
-    content: |
-      {
-        "live-restore": true,
-        "userland-proxy": false,
-        "no-new-privileges": true,
-        "log-driver": "json-file",
-        "log-opts": {
-          "max-size": "10m",
-          "max-file": "3"
-        }
-      }
-    dest: /etc/docker/daemon.json
-    owner: root
-    group: root
-    mode: "0644"
-  become: true
-  notify: Restart docker
-  tags:
-    - docker
-    - security
-
-- name: Ensure Docker socket permissions are correct
-  ansible.builtin.file:
-    path: /var/run/docker.sock
-    group: docker
-    mode: "0660"
-  become: true
-  tags:
-    - docker
-    - security
-
-- name: Create systemd override directory for Docker
-  ansible.builtin.file:
-    path: /etc/systemd/system/docker.service.d
-    state: directory
-    mode: "0755"
-  become: true
-  tags:
-    - docker
-    - security
-
-- name: Configure Docker service to run with limited capabilities
-  ansible.builtin.copy:
-    content: |
-      [Service]
-      # Additional security settings
-      NoNewPrivileges=true
-      PrivateTmp=true
-      ProtectSystem=strict
-      ProtectHome=true
-      ReadWritePaths=/var/lib/docker /var/run/docker.sock
-    dest: /etc/systemd/system/docker.service.d/security.conf
-    mode: "0644"
-  become: true
-  notify:
-    - restart docker
-  tags:
-    - docker
-    - security
