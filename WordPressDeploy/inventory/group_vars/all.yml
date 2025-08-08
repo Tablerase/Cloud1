@@ -16,8 +16,21 @@ wordpress_admin_email: admin@cloud1.local
 wordpress_container_name: wordpress_container
 wordpress_port: 80
 
+# Content configuration
+wordpress_home_title: Home
+# Use simple HTML here; will be injected into wp post update safely
+wordpress_home_content: |
+  <h1>Welcome to My Site</h1>
+  <p>This is your awesome home page.</p>
+
+# Optional local path (relative to roles/wordpress/files/) to a favicon to set as site icon;
+# Leave empty to skip
+wordpress_site_icon_src: site-icon-1024.png
+
 phpmyadmin_container_name: phpmyadmin_container
 phpmyadmin_port: 8081
 
 nginx_container_name: nginx_container
-nginx_port: 80
+
+certbot_container_name: certbot_container
+certbot_email: admin@cloud1.local

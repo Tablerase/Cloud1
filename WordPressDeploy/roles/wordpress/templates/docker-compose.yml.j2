@@ -23,7 +23,9 @@ services:
             timeout: 10s
 
     # WordPress doc: https://hub.docker.com/_/wordpress
-    # Additional config: https://github.com/docker-library/wordpress/pull/142
+    ## Additional config: https://github.com/docker-library/wordpress/pull/142
+    ## Wordpress config: https://developer.wordpress.org/advanced-administration/wordpress/wp-config/
+    ## /wordpress subdirectory setup : https://developer.wordpress.org/advanced-administration/server/wordpress-in-directory/
     wordpress:
         image: wordpress:6
         container_name: {{ wordpress_container_name }}
@@ -36,6 +38,7 @@ services:
             mysql:
                 condition: service_healthy
                 restart: true
+        working_dir: /var/www/html/wordpress
         volumes:
             - wordpress_data:/var/www/html/
             - ./logs/wordpress/wordpress:/var/log/wordpress # Optional: for logging
@@ -46,8 +49,17 @@ services:
             WORDPRESS_DB_PASSWORD: {{ mysql_password }}
             WORDPRESS_DB_NAME: {{ mysql_database }}
             WORDPRESS_CONFIG_EXTRA: |
-                define( 'WP_HOME', 'http://{{ project_domain }}/wordpress' );
-                define( 'WP_SITEURL', 'http://{{ project_domain }}/wordpress' );
+                define( 'WP_SITEURL', 'https://{{ project_domain }}/wordpress' );
+                define( 'WP_HOME', 'https://{{ project_domain }}/wordpress' );
+                define( 'WP_CONTENT_URL', 'https://{{ project_domain }}/wordpress/wp-content' );
+                define( 'FORCE_SSL_ADMIN', true );
+        healthcheck:
+            test: ["CMD", "curl", "localhost:80/wordpress"]
+            interval: 30s
+            retries: 5
+            start_period: 30s
+            timeout: 10s
+
 
     # phpMyAdmin doc: https://hub.docker.com/_/phpmyadmin
     phpmyadmin:
@@ -75,13 +87,38 @@ services:
         networks:
             - cloud1_network
         ports:
-            - "{{ nginx_port }}:80"
+            - "80:80"
+            - "443:443"
         volumes:
+            - /etc/letsencrypt:/etc/letsencrypt:ro
+            - certbot_data:/var/www/certbot
             # - ./nginx.conf:/etc/nginx/nginx.conf:ro
             - ./nginx.conf:/etc/nginx/nginx.conf
-            - ./logs/nginx:/var/log/nginx 
+            - ./logs/nginx:/var/log/nginx
+
+    # Certbot doc: https://eff-certbot.readthedocs.io/en/stable/using.html#certbot
+    certbot:
+        image: certbot/certbot
+        container_name: {{ certbot_container_name }}
+        restart: always
         depends_on:
-            - wordpress
+            - nginx
+        volumes:
+            - /etc/letsencrypt:/etc/letsencrypt
+            - certbot_data:/var/www/certbot
+            - ./logs/certbot:/var/log/letsencrypt
+        entrypoint: ""
+        command: >
+            sh -c "
+                # 1) override temp certs
+                certbot certonly --webroot --webroot-path=/var/www/certbot -n -d {{ project_domain }} --email {{ certbot_email }} --agree-tos --no-eff-email;
+                # 2) then enter a renew loop
+                trap exit TERM;
+                while :; do
+                    certbot renew --webroot --webroot-path=/var/www/certbot --quiet --deploy-hook \"nginx -s reload\";
+                    sleep 12h & wait $${!};
+                done
+            "
 
 networks:
     cloud1_network:
@@ -90,3 +127,4 @@ networks:
 volumes:
     mysql_data:
     wordpress_data:
+    certbot_data:

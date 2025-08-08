@@ -9,3 +9,21 @@
   register: cleanup_wordpress_compose_down_result
   tags:
     - cleanup
+
+- name: Remove WordPress Project files
+  ansible.builtin.file:
+    path: "{{ docker_compose_path }}"
+    state: absent
+  become: true
+  register: cleanup_wordpress_project_files_result
+  tags:
+    - cleanup
+
+- name: Remove Certs files
+  ansible.builtin.file:
+    path: "/etc/letsencrypt/live/{{ project_domain }}"
+    state: absent
+  become: true
+  register: cleanup_certs_files_result
+  tags:
+    - cleanup

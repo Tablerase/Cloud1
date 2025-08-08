@@ -39,6 +39,31 @@
     - nginx
     - templates
 
+- name: Create certs directory for bootstrap
+  ansible.builtin.file:
+    path: "/etc/letsencrypt/live/{{ project_domain }}"
+    state: directory
+    owner: "{{ project_user }}"
+    group: "{{ project_user }}"
+    mode: "0755"
+  become: true
+  tags:
+    - wordpress
+    - certs
+
+- name: Generate dummy self-signed certificate if none exists
+  ansible.builtin.command: >
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048
+      -keyout /etc/letsencrypt/live/{{ project_domain }}/privkey.pem
+      -out /etc/letsencrypt/live/{{ project_domain }}/fullchain.pem
+      -subj "/CN={{ project_domain }}"
+  args:
+    creates: "/etc/letsencrypt/live/{{ project_domain }}/fullchain.pem"
+  become: true
+  tags:
+    - wordpress
+    - certs
+
 - name: Start Docker Compose services
   community.docker.docker_compose_v2:
     project_src: "{{ docker_compose_path }}"
@@ -50,57 +75,36 @@
     - wordpress
     - docker-compose
 
-- name: Wait for MySQL container to be healthy
+# - name: Wait for MySQL container to be healthy
+#   community.docker.docker_container:
+#     name: "{{ mysql_container_name }}"
+#     state: started
+#     healthy_wait_timeout: 300 # Wait up to 5 minutes for MySQL to be healthy
+#   become: true
+#   become_user: "{{ project_user }}"
+#   register: wordpress_mysql_health_check
+#   tags:
+#     - wordpress
+#     - mysql
+#     - health-check
+
+- name: Wait for WordPress container to be healthy
   community.docker.docker_container:
-    name: "{{ mysql_container_name }}"
+    name: "{{ wordpress_container_name }}"
     state: started
-    healthy_wait_timeout: 300 # Wait up to 5 minutes for MySQL to be healthy
+    healthy_wait_timeout: 300 # Wait up to 5 minutes for WordPress to be healthy
   become: true
   become_user: "{{ project_user }}"
-  register: wordpress_mysql_health_check
+  register: wordpress_health_check
   tags:
     - wordpress
-    - mysql
     - health-check
-
-- name: Check if WordPress subdirectory exists
-  community.docker.docker_container_exec:
-    container: "{{ wordpress_container_name }}"
-    command: bash -c 'if [ -d /var/www/html/wordpress ]; then echo "exists"; else echo "not_exists"; fi'
-    user: www-data
-  register: wordpress_subdir_check
-  failed_when: false
-  changed_when: false
-  become: true
-  tags:
-    - wordpress
-    - wp-cli
-    - check
-
-- name: Move WordPress files to subdirectory
-  community.docker.docker_container_exec:
-    container: "{{ wordpress_container_name }}"
-    command: >
-      bash -O extglob -O dotglob -lc '
-        mkdir -p /var/www/html/wordpress &&
-        shopt -s extglob dotglob &&
-        mv /var/www/html/!(wordpress) /var/www/html/wordpress/
-      '
-    user: www-data
-  when: wordpress_subdir_check.stdout == "not_exists"
-  become: true
-  become_user: "{{ project_user }}"
-  tags:
-    - wordpress
-    - wp-cli
-    - move
 
 - name: Fix permissions on subdirectory
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
     command: bash -lc 'chown -R www-data:www-data /var/www/html/wordpress'
     user: "www-data"
-  when: wordpress_subdir_check.stdout == "not_exists"
   become: true
   become_user: "{{ project_user }}"
   tags:
@@ -156,38 +160,14 @@
     - wp-cli
     - install
 
-# WP-CLI Config: https://developer.wordpress.org/cli/commands/config/create/
-- name: Generate Wordpress configuration file
+- name: Check if WordPress is already installed
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
-    command: >
-      wp config create
-        --dbname={{ mysql_database }}
-        --dbuser={{ mysql_user }}
-        --dbpass={{ mysql_password }}
-        --dbhost=mysql
-        --path=/var/www/html/wordpress
-        --force
+    command: wp core is-installed --path=/var/www/html/wordpress
     user: "www-data"
-  become: true
-  become_user: "{{ project_user }}"
-  tags:
-    - wordpress
-    - wp-cli
-    - config
-
-- name: Install WordPress
-  community.docker.docker_container_exec:
-    container: "{{ wordpress_container_name }}"
-    command: >
-      wp core install
-        --url=http://{{ project_domain }}/wordpress
-        --title="{{ project_name }}"
-        --admin_user={{ wordpress_admin_user }}
-        --admin_password={{ wordpress_admin_password }}
-        --admin_email={{ wordpress_admin_email }}
-        --path=/var/www/html/wordpress
-    user: "www-data"
+  register: wordpress_is_installed
+  failed_when: false
+  changed_when: false
   become: true
   become_user: "{{ project_user }}"
   tags:
@@ -195,42 +175,168 @@
     - wp-cli
     - install
 
-# /wordpress subdirectory setup : https://developer.wordpress.org/advanced-administration/server/wordpress-in-directory/
-- name: Update WordPress URLs to subdirectory
+- name: Install WordPress
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
     command: >
-      bash -lc
-        'wp option update home http://{{ project_domain }}/wordpress --path=/var/www/html/wordpress &&
-        wp option update siteurl http://{{ project_domain }}/wordpress --path=/var/www/html/wordpress'
+      bash -lc "wp core install
+      --url=https://{{ project_domain }}/wordpress
+      --title='{{ project_name }}'
+      --admin_user='{{ wordpress_admin_user }}'
+      --admin_password='{{ wordpress_admin_password }}'
+      --admin_email='{{ wordpress_admin_email }}'
+      --path=/var/www/html/wordpress"
+    user: "www-data"
+  when: wordpress_is_installed.rc != 0
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - install
+
+################################################################################
+# WordPress content setup (Home page + Front page + optional Site Icon)
+################################################################################
+
+- name: Lookup existing Home page ID by slug
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc "wp post list --post_type=page --pagename=home --field=ID --path=/var/www/html/wordpress"
+    user: "www-data"
+  register: wordpress_home_lookup
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - content
+
+- name: Create Home page if missing
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp post create
+        --post_type=page
+        --post_title='{{ wordpress_home_title }}'
+        --post_name=home
+        --post_status=publish
+        --porcelain
+        --path=/var/www/html/wordpress
+    user: "www-data"
+  when: (wordpress_home_lookup.stdout | trim) == ""
+  register: wordpress_home_create
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - content
+
+- name: Determine Home page ID
+  ansible.builtin.set_fact:
+    wordpress_home_page_id: >-
+      {{ (wordpress_home_lookup.stdout | trim) if (wordpress_home_lookup.stdout | trim) != '' else (wordpress_home_create.stdout | trim) }}
+  tags:
+    - wordpress
+    - wp-cli
+    - content
+
+- name: Update Home page content
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc "wp post update {{ wordpress_home_page_id }}
+      --post_content={{ wordpress_home_content | quote }}
+      --path=/var/www/html/wordpress"
     user: "www-data"
   become: true
   become_user: "{{ project_user }}"
   tags:
     - wordpress
     - wp-cli
-    - subdirectory
+    - content
 
-- name: Add .htaccess for subdirectory rewrite
+- name: Set front page to display a static page
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
-    command: |
-      bash -lc 'cat > /var/www/html/.htaccess <<EOF
-      <IfModule mod_rewrite.c>
-      RewriteEngine on
-      RewriteCond %{HTTP_HOST} ^(www\.)?{{ project_domain }}$
-      RewriteCond %{REQUEST_URI} !^/wordpress/
-      RewriteCond %{REQUEST_FILENAME} !-f
-      RewriteCond %{REQUEST_FILENAME} !-d
-      RewriteRule ^(.*)$ /wordpress/$1 [L]
-      RewriteCond %{HTTP_HOST} ^(www\.)?{{ project_domain }}$
-      RewriteRule ^(/)?$ wordpress/index.php [L]
-      </IfModule>
-      EOF
-      '
+    command: >
+      wp option update show_on_front page --path=/var/www/html/wordpress
     user: "www-data"
   become: true
   become_user: "{{ project_user }}"
   tags:
     - wordpress
-    - htaccess
+    - wp-cli
+    - content
+
+- name: Set Home page as the front page
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp option update page_on_front {{ wordpress_home_page_id }} --path=/var/www/html/wordpress
+    user: "www-data"
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - content
+
+- name: Check if site icon is already set
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp option get site_icon --path=/var/www/html/wordpress
+    user: "www-data"
+  register: wordpress_site_icon_option
+  failed_when: false
+  changed_when: false
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - content
+
+- name: Copy site icon to remote host temp (if provided)
+  ansible.builtin.copy:
+    src: "{{ wordpress_site_icon_src }}"
+    dest: "/tmp/icon.png"
+    mode: "0644"
+  when: (wordpress_site_icon_src | default('')) != '' and (wordpress_site_icon_option.stdout | trim) in ['', '0']
+  become: true
+  tags:
+    - wordpress
+    - wp-cli
+    - content
+
+- name: Copy site icon into WordPress container (docker cp)
+  ansible.builtin.command: >
+    docker cp /tmp/icon.png {{ wordpress_container_name }}:/tmp/icon.png
+  when: (wordpress_site_icon_src | default('')) != '' and (wordpress_site_icon_option.stdout | trim) in ['', '0']
+  changed_when: true
+  become: true
+  tags:
+    - wordpress
+    - wp-cli
+    - content
+
+- name: Import site icon into WordPress and set option
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc 'icon_id=$(wp media import /tmp/icon.png --title="Favicon" --alt="Site Favicon"
+      --porcelain --path=/var/www/html/wordpress) &&
+      wp option update site_icon "$icon_id" --path=/var/www/html/wordpress'
+    user: "www-data"
+  when: (wordpress_site_icon_src | default('')) != '' and (wordpress_site_icon_option.stdout | trim) in ['', '0']
+  become: true
+  become_user: "{{ project_user }}"
+  tags:
+    - wordpress
+    - wp-cli
+    - content

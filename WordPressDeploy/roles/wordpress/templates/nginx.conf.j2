@@ -48,30 +48,49 @@ http {
         font/opentype
         application/vnd.ms-fontobject
         image/svg+xml;
+    
+    server {
+        listen      80;
+        server_name {{ project_domain }};
+        return      301 https://$host$request_uri; # Redirect HTTP to HTTPS
+    }
 
     server {
-        listen {{ nginx_port }};
+        listen      443 ssl;
         server_name {{ project_domain }};
+
+        # SSL settings
+        ssl_certificate     /etc/letsencrypt/live/{{ project_domain }}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/{{ project_domain }}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_ciphers         HIGH:!aNULL:!MD5;
+        ## Allow certbot challenge
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+            allow all;
+        }
 
         # WordPress configuration
         # reverse proxy: https://developer.wordpress.org/advanced-administration/security/https/#using-a-reverse-proxy
         # subdirectory: https://developer.wordpress.org/advanced-administration/server/wordpress-in-directory/
         location / {
             proxy_pass http://{{ wordpress_container_name }}:{{ wordpress_port }};
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Host $server_name;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host               $host;
+            proxy_set_header X-Real-IP          $remote_addr;
+            proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Host   $server_name;
+            proxy_set_header X-Forwarded-Proto  https;
+            proxy_redirect                      off;
         }
 
         # phpMyAdmin configuration
         location /myadmin/ {
             proxy_pass http://{{ phpmyadmin_container_name }}:{{ phpmyadmin_port }}/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host               $host;
+            proxy_set_header X-Real-IP          $remote_addr;
+            proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Host   $server_name;
+            proxy_set_header X-Forwarded-Proto  https;
         }
 
         # Security headers
