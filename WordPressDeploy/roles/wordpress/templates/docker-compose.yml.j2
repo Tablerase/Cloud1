@@ -5,18 +5,21 @@ services:
         container_name: {{ mysql_container_name }}
         restart: always
         environment:
-            MYSQL_ROOT_PASSWORD: {{ mysql_root_password }}
+            MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
             MYSQL_DATABASE: {{ mysql_database }}
             MYSQL_USER: {{ mysql_user }}
-            MYSQL_PASSWORD: {{ mysql_password }}
+            MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
         expose:
             - "{{ mysql_port }}"
         networks:
             - cloud1_network
         volumes:
             - mysql_data:/var/lib/mysql
+        secrets:
+            - mysql_root_password
+            - mysql_password
         healthcheck:
-            test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "{{ mysql_user }}", "-p{{ mysql_password }}"]
+            test: ["CMD-SHELL", "mysqladmin ping -h localhost -u {{ mysql_user }} -p\"$(cat /run/secrets/mysql_password)\""]
             interval: 30s
             retries: 5
             start_period: 30s
@@ -46,13 +49,16 @@ services:
         environment:
             WORDPRESS_DB_HOST: mysql:{{ mysql_port }}
             WORDPRESS_DB_USER: {{ mysql_user }}
-            WORDPRESS_DB_PASSWORD: {{ mysql_password }}
+            # TODO: Handle mysql_password permissions errors
+            WORDPRESS_DB_PASSWORD_FILE: /run/secrets/mysql_password
             WORDPRESS_DB_NAME: {{ mysql_database }}
             WORDPRESS_CONFIG_EXTRA: |
                 define( 'WP_SITEURL', 'https://{{ project_domain }}/wordpress' );
                 define( 'WP_HOME', 'https://{{ project_domain }}/wordpress' );
                 define( 'WP_CONTENT_URL', 'https://{{ project_domain }}/wordpress/wp-content' );
                 define( 'FORCE_SSL_ADMIN', true );
+        secrets:
+            - mysql_password
         healthcheck:
             test: ["CMD", "curl", "localhost:80/wordpress"]
             interval: 30s
@@ -68,8 +74,6 @@ services:
         restart: always
         environment:
             PMA_HOST: mysql
-            PMA_USER: {{ mysql_user }} # Only for auto-login during development
-            PMA_PASSWORD: {{ mysql_password }} # Only for auto-login during development
             APACHE_PORT: "{{ phpmyadmin_port }}"
             PMA_ABSOLUTE_URI: "http://{{ project_domain }}/myadmin"
         networks:
@@ -128,3 +132,9 @@ volumes:
     mysql_data:
     wordpress_data:
     certbot_data:
+
+secrets:
+    mysql_root_password:
+        file: ./secrets/mysql_root_password
+    mysql_password:
+        file: ./secrets/mysql_password

@@ -7,7 +7,8 @@ logs/
 
 # Ignore Ansible Vault files
 *.vault
-*.vault_pass
+*.vault_pass*
+vault.yml
 
 # Ignore key files
 keys/

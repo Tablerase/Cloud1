@@ -12,6 +12,19 @@
     - directory
     - create
 
+- name: Validate required secret variables are set
+  ansible.builtin.assert:
+    that:
+      - (mysql_root_password | default('')) | length > 0
+      - (mysql_password | default('')) | length > 0
+      - (wordpress_admin_password | default('')) | length > 0
+    fail_msg: "One or more required secrets are empty. Ensure vault variables are set and decrypted."
+    success_msg: "All required secrets are present."
+  tags:
+    - wordpress
+    - secrets
+    - validate
+
 - name: Copy Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
@@ -24,6 +37,41 @@
   tags:
     - wordpress
     - templates
+
+- name: Create secrets directory for compose
+  ansible.builtin.file:
+    path: "{{ docker_compose_path }}/secrets"
+    state: directory
+    owner: "{{ project_user }}"
+    group: "{{ project_user }}"
+    mode: "0700"
+  tags:
+    - wordpress
+    - secrets
+
+- name: Write MySQL root password secret file
+  ansible.builtin.copy:
+    dest: "{{ docker_compose_path }}/secrets/mysql_root_password"
+    content: "{{ mysql_root_password | default('') }}\n"
+    owner: "www-data"
+    group: "www-data"
+    mode: "0600"
+  # no_log: true
+  tags:
+    - wordpress
+    - secrets
+
+- name: Write MySQL user password secret file
+  ansible.builtin.copy:
+    dest: "{{ docker_compose_path }}/secrets/mysql_password"
+    content: "{{ mysql_password | default('') }}\n"
+    owner: "www-data"
+    group: "www-data"
+    mode: "0600"
+  # no_log: true
+  tags:
+    - wordpress
+    - secrets
 
 - name: Copy Nginx configuration file
   ansible.builtin.template:
@@ -75,19 +123,6 @@
     - wordpress
     - docker-compose
 
-# - name: Wait for MySQL container to be healthy
-#   community.docker.docker_container:
-#     name: "{{ mysql_container_name }}"
-#     state: started
-#     healthy_wait_timeout: 300 # Wait up to 5 minutes for MySQL to be healthy
-#   become: true
-#   become_user: "{{ project_user }}"
-#   register: wordpress_mysql_health_check
-#   tags:
-#     - wordpress
-#     - mysql
-#     - health-check
-
 - name: Wait for WordPress container to be healthy
   community.docker.docker_container:
     name: "{{ wordpress_container_name }}"
@@ -103,10 +138,8 @@
 - name: Fix permissions on subdirectory
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
-    command: bash -lc 'chown -R www-data:www-data /var/www/html/wordpress'
-    user: "www-data"
+    command: chown -R www-data:www-data /var/www/html/wordpress
   become: true
-  become_user: "{{ project_user }}"
   tags:
     - wordpress
     - wp-cli
@@ -121,6 +154,7 @@
   failed_when: false
   changed_when: false
   become: true
+  become_user: "{{ project_user }}"
   tags:
     - wordpress
     - wp-cli
@@ -190,6 +224,7 @@
   when: wordpress_is_installed.rc != 0
   become: true
   become_user: "{{ project_user }}"
+  no_log: true
   tags:
     - wordpress
     - wp-cli

@@ -3,15 +3,15 @@ project_domain: cloud1.local
 project_user: cloud1
 docker_compose_path: /opt/cloud1_project
 
-mysql_root_password: secure_password
+mysql_root_password: "{{ vault_mysql_root_password }}"
 mysql_database: my_database
 mysql_user: wp_user
-mysql_password: secure_password
+mysql_password: "{{ vault_mysql_password }}"
 mysql_port: 3306
 mysql_container_name: mysql_container
 
 wordpress_admin_user: admin
-wordpress_admin_password: secure_password
+wordpress_admin_password: "{{ vault_wordpress_admin_password }}"
 wordpress_admin_email: admin@cloud1.local
 wordpress_container_name: wordpress_container
 wordpress_port: 80
@@ -33,4 +33,4 @@ phpmyadmin_port: 8081
 nginx_container_name: nginx_container
 
 certbot_container_name: certbot_container
-certbot_email: admin@cloud1.local
+certbot_email: "{{ vault_certbot_email }}"
