@@ -50,6 +50,7 @@ flowchart TB
     end
     subgraph Cloud["☁️ Cloud Instance"]
       sshAccess@{ shape: terminal, label: "SSH Access" }
+      certificates@{ shape: docs, label: "Certificates" }
       subgraph DockerEngine
         subgraph DatabaseContainer["Database Container"]
             DB@{ shape: database, label: "MySQL Database" }
@@ -63,6 +64,9 @@ flowchart TB
         subgraph WebServer1Container["Web Server 1 Container"]
             WP1@{ shape: loop-limit, label: "Apache WordPress Application" }
         end
+        subgraph CertbotContainer["Certbot Container"]
+            CB@{ shape: terminal, label: "Certbot" }
+        end
       end
     end
 
@@ -72,10 +76,13 @@ flowchart TB
     sshAccess aws1@--> WebServer1Container
     sshAccess adb@--> DatabaseContainer
     sshAccess apma@--> PMAContainer
+    sshAccess acb@--> CertbotContainer
     RVP rvp1@-->|/wordpress<br>80| WP1
     RVP rvp2@-->|/myadmin<br>8081| PMA
     WP1 -->|3306| DB
     PMA -->|3306| DB
+    CB <--> certificates
+    RVP --> certificates
 
     classDef files fill: #fadc89ff,color: #616161ff,stroke: #b4befe
     classDef database fill: #7575bdff,color: #ffffffff,stroke: #45475a
@@ -87,7 +94,7 @@ flowchart TB
     classDef ansible-anim stroke-dasharray: 5,5, stroke-dashoffset: 300, stroke-width: 2, stroke: #e0b25cff, animation: dash 25s linear infinite;
 
     class rvp1,rvp2,w web-anim
-    class assh,arvp,aws1,adb,apma ansible-anim
+    class assh,arvp,aws1,adb,apma,acb ansible-anim
     class InvFile,PLY files
     class DB,PMA database
     class RVP,WP1,WP2,WorldWideWeb web

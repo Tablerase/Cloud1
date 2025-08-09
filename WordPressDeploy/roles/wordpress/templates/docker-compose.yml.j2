@@ -1,7 +1,8 @@
+# TODO: performance improvement with php-fpm-alpine if needed
 services:
     # MySQL Database doc: https://hub.docker.com/_/mysql
     mysql:
-        image: mysql:9
+        image: mysql:lts
         container_name: {{ mysql_container_name }}
         restart: always
         environment:
@@ -30,7 +31,7 @@ services:
     ## Wordpress config: https://developer.wordpress.org/advanced-administration/wordpress/wp-config/
     ## /wordpress subdirectory setup : https://developer.wordpress.org/advanced-administration/server/wordpress-in-directory/
     wordpress:
-        image: wordpress:6
+        image: wordpress:6 
         container_name: {{ wordpress_container_name }}
         restart: always
         networks:
@@ -44,12 +45,10 @@ services:
         working_dir: /var/www/html/wordpress
         volumes:
             - wordpress_data:/var/www/html/
-            - ./logs/wordpress/wordpress:/var/log/wordpress # Optional: for logging
-            - ./logs/wordpress/apache2:/var/log/apache2 # Optional: for logging
+            - ./logs/wordpress/apache2:/var/log/apache2
         environment:
             WORDPRESS_DB_HOST: mysql:{{ mysql_port }}
             WORDPRESS_DB_USER: {{ mysql_user }}
-            # TODO: Handle mysql_password permissions errors
             WORDPRESS_DB_PASSWORD_FILE: /run/secrets/mysql_password
             WORDPRESS_DB_NAME: {{ mysql_database }}
             WORDPRESS_CONFIG_EXTRA: |
@@ -60,7 +59,8 @@ services:
         secrets:
             - mysql_password
         healthcheck:
-            test: ["CMD", "curl", "localhost:80/wordpress"]
+            # -f returns an error on server errors (4xx, 5xx), but not on redirects (3xx).
+            test: ["CMD", "curl", "-f", "http://localhost:80/wordpress/wp-login.php"]
             interval: 30s
             retries: 5
             start_period: 30s

@@ -17,13 +17,9 @@ wordpress_container_name: wordpress_container
 wordpress_port: 80
 
 # Content configuration
-wordpress_home_title: Home
-# Use simple HTML here; will be injected into wp post update safely
-wordpress_home_content: |
-  <h1>Welcome to My Site</h1>
-  <p>This is your awesome home page.</p>
-
 # Optional local path (relative to roles/wordpress/files/) to a favicon to set as site icon;
+wordpress_home_title: Home
+wordpress_home_content_file: home_page_content.html
 # Leave empty to skip
 wordpress_site_icon_src: site-icon-1024.png
 

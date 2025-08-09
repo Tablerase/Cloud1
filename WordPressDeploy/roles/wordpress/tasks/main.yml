@@ -123,14 +123,44 @@
     - wordpress
     - docker-compose
 
-- name: Wait for WordPress container to be healthy
-  community.docker.docker_container:
-    name: "{{ wordpress_container_name }}"
-    state: started
-    healthy_wait_timeout: 300 # Wait up to 5 minutes for WordPress to be healthy
+- name: Wait for MySQL container to be healthy
+  community.docker.docker_container_info:
+    name: "{{ mysql_container_name }}"
   become: true
   become_user: "{{ project_user }}"
-  register: wordpress_health_check
+  register: wordpress_mysql_container_info
+  until: wordpress_mysql_container_info.container is defined and wordpress_mysql_container_info.container.State.Health.Status == "healthy"
+  retries: 10 # 10 retries * 30s delay = 300s (5 minutes)
+  delay: 30 # seconds
+  tags:
+    - wordpress
+    - health-check
+
+- name: Fail if MySQL container is not healthy
+  ansible.builtin.fail:
+    msg: "MySQL container {{ mysql_container_name }} failed health check or timed out"
+  when: not wordpress_mysql_container_info.container or wordpress_mysql_container_info.container.State.Health.Status != "healthy"
+  tags:
+    - wordpress
+    - health-check
+
+- name: Wait for WordPress container to be healthy
+  community.docker.docker_container_info:
+    name: "{{ wordpress_container_name }}"
+  become: true
+  become_user: "{{ project_user }}"
+  register: wordpress_container_info
+  until: wordpress_container_info.container is defined and wordpress_container_info.container.State.Health.Status == "healthy"
+  retries: 10 # 10 retries * 30s delay = 300s (5 minutes)
+  delay: 30 # seconds
+  tags:
+    - wordpress
+    - health-check
+
+- name: Fail if WordPress container is not healthy
+  ansible.builtin.fail:
+    msg: "WordPress container {{ wordpress_container_name }} failed health check or timed out"
+  when: not wordpress_container_info.container or wordpress_container_info.container.State.Health.Status != "healthy"
   tags:
     - wordpress
     - health-check
@@ -164,7 +194,7 @@
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
     command: curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-  when: wordpress_cli_check.rc != 0
+  when: wordpress_cli_check.rc != 0 # TODO: improve condition in case check fails
   tags:
     - wordpress
     - wp-cli
@@ -280,14 +310,22 @@
     - wp-cli
     - content
 
-- name: Update Home page content
+- name: Set home page content from file if specified
+  ansible.builtin.set_fact:
+    wordpress_home_content: "{{ lookup('file', wordpress_home_content_file) }}"
+  when: wordpress_home_content_file is defined and wordpress_home_content_file != ''
+
+- name: Update WordPress Home Page
   community.docker.docker_container_exec:
     container: "{{ wordpress_container_name }}"
+    # The '-' tells wp-cli to read the content from stdin
     command: >
-      bash -lc "wp post update {{ wordpress_home_page_id }}
-      --post_content={{ wordpress_home_content | quote }}
-      --path=/var/www/html/wordpress"
-    user: "www-data"
+      wp post update {{ wordpress_home_page_id }} -
+      --allow-root
+      --path=/var/www/html/wordpress
+    # Pass the content via the stdin parameter
+    stdin: "{{ wordpress_home_content }}"
+  when: wordpress_home_content is defined and wordpress_home_content | length > 0
   become: true
   become_user: "{{ project_user }}"
   tags:
