@@ -16,6 +16,9 @@ keys/
 *.key
 *.pub
 
+# Ignore inventory files with host details
+inventory/inventory.yml
+
 # Ignore Python virtual environments and logs
 __pycache__/
 *.pyc

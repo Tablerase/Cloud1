@@ -1,6 +1,105 @@
 # Cloud1
 
+<img src='./roles/wordpress/files/site-icon-1024.png' alt='WordPress Site Icon' align='right' width='200px' />
+
 Automated deployment of a WordPress website on a remote server provided by a cloud provider.
+
+## Setup
+
+1. Clone the repository:
+
+   ```bash
+   git clone git@github.com:Tablerase/Cloud1.git
+   cd Cloud1
+   ```
+
+2. Create a Python virtual environment (optional but recommended):
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. Install the required dependencies (Ansible):
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Configure your inventory file:
+
+   ```bash
+   cp inventory/inventory.example.yml inventory/inventory.yml
+   ```
+
+5. **Edit the `inventory/inventory.yml` file** to add your server details. Like for example:
+
+   ```yaml
+   all:
+     hosts:
+       wp1:
+         ansible_host: your.server.instance.ip
+         ansible_user: root
+         ansible_ssh_private_key_file: ~/.ssh/id_rsa # or other key file
+   ```
+
+6. **Configure vault** by creating a vault password file and creating a vault-encrypted file.
+
+   ```bash
+   echo "your_vault_password" > .vault_pass.txt
+   ```
+
+   Then, create a vault-encrypted file using the following command:
+
+   ```bash
+   ansible-vault create inventory/group_vars/vault.yml
+   ```
+
+   Then, edit the `inventory/group_vars/vault.yml` file to add your sensitive variables:
+
+   ```yaml
+   # This file will be encrypted with ansible-vault.
+   # Define sensitive variables here and reference them from plain group_vars via vault_* variables.
+
+   vault_mysql_root_password: your_mysql_root_password
+   vault_mysql_password: your_mysql_password
+   vault_wordpress_admin_password: your_wordpress_admin_password
+   vault_wordpress_admin_email: your_wordpress_admin_email
+   vault_certbot_email: your_certbot_email
+   ```
+
+   If needed, to decrypt the vault file, use the following command:
+
+   ```bash
+   ansible-vault decrypt inventory/group_vars/vault.yml
+   ```
+
+7. **Check your Ansible connection** by running the following command:
+
+   ```bash
+   ansible all -i inventory/inventory.yml -m ping
+   ```
+
+   - If the connection is successful, you should see a "pong" response from each host.
+   - Otherwise, check your SSH configuration (like your SSH keys and config file), ensure that the Ansible user (from inventory) has the necessary permissions to connect to the remote server, and that the server is reachable.
+
+8. **Deploy your WordPress site** by running the following command:
+
+   ```bash
+   ansible-playbook -i inventory/inventory.yml playbooks/site.yml
+   ```
+
+   If you need to pass any extra variables to the playbook, you can do so using the `-e` flag:
+
+   ```bash
+   ansible-playbook -i inventory/inventory.yml playbooks/site.yml -e "variable_name=value"
+   ```
+
+   If you need to use only certain roles from the playbook, you can specify them using the `--tags` flag:
+
+   ```bash
+   ansible-playbook -i inventory/inventory.yml playbooks/site.yml --tags "tag_name"
+   ```
 
 ## Infrastructure
 
@@ -61,8 +160,8 @@ flowchart TB
         subgraph ReverseProxyContainer["Reverse Proxy Container"]
             RVP@{ shape: procs, label: "Reverse Proxy<br>Nginx" }
         end
-        subgraph WebServer1Container["Web Server 1 Container"]
-            WP1@{ shape: loop-limit, label: "Apache WordPress Application" }
+        subgraph WebServerContainer["Web Server Container"]
+            WP@{ shape: loop-limit, label: "Apache WordPress Application" }
         end
         subgraph CertbotContainer["Certbot Container"]
             CB@{ shape: terminal, label: "Certbot" }
@@ -73,13 +172,13 @@ flowchart TB
     WorldWideWeb w@-->|443/HTTPS| RVP
     AnsibleController assh@-->|22/SSH| sshAccess
     sshAccess arvp@--> ReverseProxyContainer
-    sshAccess aws1@--> WebServer1Container
+    sshAccess aws1@--> WebServerContainer
     sshAccess adb@--> DatabaseContainer
     sshAccess apma@--> PMAContainer
     sshAccess acb@--> CertbotContainer
-    RVP rvp1@-->|/wordpress<br>80| WP1
+    RVP rvp1@-->|/wordpress<br>80| WP
     RVP rvp2@-->|/myadmin<br>8081| PMA
-    WP1 -->|3306| DB
+    WP -->|3306| DB
     PMA -->|3306| DB
     CB <--> certificates
     RVP --> certificates
@@ -97,7 +196,7 @@ flowchart TB
     class assh,arvp,aws1,adb,apma,acb ansible-anim
     class InvFile,PLY files
     class DB,PMA database
-    class RVP,WP1,WP2,WorldWideWeb web
+    class RVP,WP,WorldWideWeb web
     class AnsibleController ansible
     class WebServer1Container,WebServer2Container,ReverseProxyContainer webContainer
     class DockerEngine docker
@@ -167,6 +266,8 @@ Ansible operates on a control node that manages one or more managed nodes. The c
 
 Inventories allow you to define the managed nodes and their connection details. Ansible uses these inventories to know which nodes to target for configuration management.
 
+Playbooks are YAML files that define the tasks to be executed on the managed nodes.
+
 Roles are a way to organize playbooks and tasks into reusable components. They can be shared and reused across different projects.
 
 #### Example Inventory
@@ -182,7 +283,10 @@ all:
     ansible_user: user
 ```
 
-Playbooks are YAML files that define the tasks to be executed on the managed nodes.
+```bash
+# Test ping
+ansible all -m ping
+```
 
 #### Example Playbook
 
@@ -252,6 +356,11 @@ Ansible modules are the building blocks of Ansible tasks. They are reusable scri
 Ansible can execute tasks in parallel across multiple managed nodes, making it efficient for large-scale deployments. This is achieved through the use of SSH connections and the ability to run tasks concurrently.
 
 [Ansible Parallelism](https://thelinuxcode.com/ansible-parallelism/)
+
+```bash
+# Parallel execution example (default 5 forks)
+ansible all -m ping -f 10
+```
 
 ## Multipass
 

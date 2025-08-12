@@ -1,5 +1,5 @@
 project_name: cloud1_project
-project_domain: cloud1.local
+project_domain: rcutte.duckdns.org
 project_user: cloud1
 docker_compose_path: /opt/cloud1_project
 
@@ -12,7 +12,7 @@ mysql_container_name: mysql_container
 
 wordpress_admin_user: admin
 wordpress_admin_password: "{{ vault_wordpress_admin_password }}"
-wordpress_admin_email: admin@cloud1.local
+wordpress_admin_email: "{{ vault_wordpress_admin_email }}"
 wordpress_container_name: wordpress_container
 wordpress_port: 80
 
