@@ -146,7 +146,11 @@ flowchart TB
          ansible_ssh_private_key_file: ~/.ssh/id_rsa # or other key file
    ```
 
-6. **Configure vault** by creating a vault password file and creating a vault-encrypted file.
+6. **Configure variables** by editing the `inventory/group_vars/all/all.yml` file.
+
+   - For `project_domain`: use website like [DuckDNS](https://www.duckdns.org/domains) to get a free domain name. Just put the ip address of your server instance and choose a domain name.
+
+7. **Configure vault** by creating a vault password file and creating a vault-encrypted file.
 
    ```bash
    echo "your_vault_password" > .vault_pass.txt
@@ -177,7 +181,7 @@ flowchart TB
    ansible-vault decrypt inventory/group_vars/all/vault.yml
    ```
 
-7. **Check your Ansible connection** by running the following command:
+8. **Check your Ansible connection** by running the following command:
 
    ```bash
    ansible all -i inventory/inventory.yml -m ping
@@ -186,7 +190,7 @@ flowchart TB
    - If the connection is successful, you should see a "pong" response from each host.
    - Otherwise, check your SSH configuration (like your SSH keys and config file), ensure that the Ansible user (from inventory) has the necessary permissions to connect to the remote server, and that the server is reachable.
 
-8. **Deploy your WordPress site** by running the following command:
+9. **Deploy your WordPress site** by running the following command:
 
    ```bash
    ansible-playbook -i inventory/inventory.yml playbooks/site.yml
