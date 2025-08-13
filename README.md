@@ -2,104 +2,9 @@
 
 <img src='./roles/wordpress/files/site-icon-1024.png' alt='WordPress Site Icon' align='right' width='200px' />
 
-Automated deployment of a WordPress website on a remote server provided by a cloud provider.
-
-## Setup
-
-1. Clone the repository:
-
-   ```bash
-   git clone git@github.com:Tablerase/Cloud1.git
-   cd Cloud1
-   ```
-
-2. Create a Python virtual environment (optional but recommended):
-
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-
-3. Install the required dependencies (Ansible):
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configure your inventory file:
-
-   ```bash
-   cp inventory/inventory.example.yml inventory/inventory.yml
-   ```
-
-5. **Edit the `inventory/inventory.yml` file** to add your server details. Like for example:
-
-   ```yaml
-   all:
-     hosts:
-       wp1:
-         ansible_host: your.server.instance.ip
-         ansible_user: root
-         ansible_ssh_private_key_file: ~/.ssh/id_rsa # or other key file
-   ```
-
-6. **Configure vault** by creating a vault password file and creating a vault-encrypted file.
-
-   ```bash
-   echo "your_vault_password" > .vault_pass.txt
-   ```
-
-   Then, create a vault-encrypted file using the following command:
-
-   ```bash
-   ansible-vault create inventory/group_vars/vault.yml
-   ```
-
-   Then, edit the `inventory/group_vars/vault.yml` file to add your sensitive variables:
-
-   ```yaml
-   # This file will be encrypted with ansible-vault.
-   # Define sensitive variables here and reference them from plain group_vars via vault_* variables.
-
-   vault_mysql_root_password: your_mysql_root_password
-   vault_mysql_password: your_mysql_password
-   vault_wordpress_admin_password: your_wordpress_admin_password
-   vault_wordpress_admin_email: your_wordpress_admin_email
-   vault_certbot_email: your_certbot_email
-   ```
-
-   If needed, to decrypt the vault file, use the following command:
-
-   ```bash
-   ansible-vault decrypt inventory/group_vars/vault.yml
-   ```
-
-7. **Check your Ansible connection** by running the following command:
-
-   ```bash
-   ansible all -i inventory/inventory.yml -m ping
-   ```
-
-   - If the connection is successful, you should see a "pong" response from each host.
-   - Otherwise, check your SSH configuration (like your SSH keys and config file), ensure that the Ansible user (from inventory) has the necessary permissions to connect to the remote server, and that the server is reachable.
-
-8. **Deploy your WordPress site** by running the following command:
-
-   ```bash
-   ansible-playbook -i inventory/inventory.yml playbooks/site.yml
-   ```
-
-   If you need to pass any extra variables to the playbook, you can do so using the `-e` flag:
-
-   ```bash
-   ansible-playbook -i inventory/inventory.yml playbooks/site.yml -e "variable_name=value"
-   ```
-
-   If you need to use only certain roles from the playbook, you can specify them using the `--tags` flag:
-
-   ```bash
-   ansible-playbook -i inventory/inventory.yml playbooks/site.yml --tags "tag_name"
-   ```
+Automated deployment of a WordPress website on a cloud instance.
+This project uses **Ansible** to configure a cloud instance with Docker containers running **MySQL**, **PHPMyAdmin**, **Nginx**, and **WordPress**. It also includes automatic **SSL** certificate management using **Certbot**.
+**Ansible vault** and **docker secrets** are used to secure sensitive information.
 
 ## Infrastructure
 
@@ -201,6 +106,103 @@ flowchart TB
     class WebServer1Container,WebServer2Container,ReverseProxyContainer webContainer
     class DockerEngine docker
 ```
+
+## Setup
+
+1. Clone the repository:
+
+   ```bash
+   git clone git@github.com:Tablerase/Cloud1.git
+   cd Cloud1
+   ```
+
+2. Create a Python virtual environment (optional but recommended):
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. Install the required dependencies (Ansible):
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Configure your inventory file:
+
+   ```bash
+   cp inventory/inventory.example.yml inventory/inventory.yml
+   ```
+
+5. **Edit the `inventory/inventory.yml` file** to add your server details. Like for example:
+
+   ```yaml
+   all:
+     hosts:
+       wp1:
+         ansible_host: your.server.instance.ip
+         ansible_user: root
+         ansible_ssh_private_key_file: ~/.ssh/id_rsa # or other key file
+   ```
+
+6. **Configure vault** by creating a vault password file and creating a vault-encrypted file.
+
+   ```bash
+   echo "your_vault_password" > .vault_pass.txt
+   ```
+
+   Then, create a vault-encrypted file using the following command:
+
+   ```bash
+   ansible-vault create inventory/group_vars/all/vault.yml
+   ```
+
+   Then, edit the `inventory/group_vars/all/vault.yml` file to add your sensitive variables:
+
+   ```yaml
+   # This file will be encrypted with ansible-vault.
+   # Define sensitive variables here and reference them from plain group_vars via vault_* variables.
+
+   vault_mysql_root_password: your_mysql_root_password
+   vault_mysql_password: your_mysql_password
+   vault_wordpress_admin_password: your_wordpress_admin_password
+   vault_wordpress_admin_email: your_wordpress_admin_email
+   vault_certbot_email: your_certbot_email
+   ```
+
+   If needed, to decrypt the vault file, use the following command:
+
+   ```bash
+   ansible-vault decrypt inventory/group_vars/all/vault.yml
+   ```
+
+7. **Check your Ansible connection** by running the following command:
+
+   ```bash
+   ansible all -i inventory/inventory.yml -m ping
+   ```
+
+   - If the connection is successful, you should see a "pong" response from each host.
+   - Otherwise, check your SSH configuration (like your SSH keys and config file), ensure that the Ansible user (from inventory) has the necessary permissions to connect to the remote server, and that the server is reachable.
+
+8. **Deploy your WordPress site** by running the following command:
+
+   ```bash
+   ansible-playbook -i inventory/inventory.yml playbooks/site.yml
+   ```
+
+   If you need to pass any extra variables to the playbook, you can do so using the `-e` flag:
+
+   ```bash
+   ansible-playbook -i inventory/inventory.yml playbooks/site.yml -e "variable_name=value"
+   ```
+
+   If you need to use only certain roles from the playbook, you can specify them using the `--tags` flag:
+
+   ```bash
+   ansible-playbook -i inventory/inventory.yml playbooks/site.yml --tags "tag_name"
+   ```
 
 <img src="https://www.svgrepo.com/show/373429/ansible.svg" alt="Ansible Logo" align="right" width="100px" />
 
@@ -390,4 +392,55 @@ To delete a VM, use:
 
 ```bash
 multipass delete my-vm
+```
+
+## Certbot
+
+Certbot is a tool for automatically obtaining and renewing SSL/TLS certificates from the Let's Encrypt Certificate Authority. It simplifies the process of securing your web applications with HTTPS.
+
+```mermaid
+---
+title: Certbot Challenge Flow
+config:
+  layout: dagre
+---
+flowchart TB
+    WorldWideWeb@{ shape: dbl-circ, label: "🌐<br>World Wide<br>Web" }
+    subgraph Cloud["☁️ Cloud Instance"]
+      certificates@{ shape: docs, label: "Certificates" }
+      subgraph DockerEngine
+        subgraph ReverseProxyContainer["Reverse Proxy Container"]
+            RVP@{ shape: procs, label: "Reverse Proxy<br>Nginx" }
+        end
+        subgraph CertbotContainer["Certbot Container"]
+            CB@{ shape: terminal, label: "Certbot" }
+        end
+        CBChallenge@{ shape: doc, label: "Certbot Challenge" }
+      end
+    end
+
+    WorldWideWeb w@-->|443/HTTPS<br>**/**| RVP
+    CB cb1@-->|Send Challenge|WorldWideWeb
+    WorldWideWeb cb2@-->|80/HTTP<br>**/.well-known/acme-challenge/**| RVP
+    RVP cb3@-->|Write Challenge Response| CBChallenge
+    CBChallenge cb4@-->|Read Challenge Response| CB
+    CB <-->|Create/Renew| certificates
+    RVP -->|Use| certificates
+
+    classDef files fill: #fadc89ff,color: #616161ff,stroke: #b4befe
+    classDef database fill: #7575bdff,color: #ffffffff,stroke: #45475a
+    classDef web fill: #88e68dff,color: #575757ff,stroke: #45475a
+    classDef ansible fill: #89b4fa,color: #1e1e2e,stroke: #b4befe
+    classDef webContainer fill: #a6e3a17c,color: #1e1e2e,stroke: #94e2d5
+    classDef docker fill: #dff8ffff,color: #1e1e2e,stroke: #dff8ffff
+    classDef certbot fill: #9966ff,color: #ffffff,stroke: #7a4dcf
+    classDef web-anim stroke-dasharray: 9,5, stroke-dashoffset: 900, stroke-width: 2, stroke: #489e5dff, animation: dash 25s linear infinite;
+    classDef challenge-anim stroke-dasharray: 5,5, stroke-dashoffset: 300, stroke-width: 2, stroke: #db5ce0ff, animation: dash 25s linear infinite;
+
+    class cb1,cb2,cb3,cb4 challenge-anim
+    class rvp1,rvp2,w web-anim
+    class CB,CBChallenge,certificates certbot
+    class RVP,WP,WorldWideWeb web
+    class WebServer1Container,WebServer2Container,ReverseProxyContainer webContainer
+    class DockerEngine docker
 ```
