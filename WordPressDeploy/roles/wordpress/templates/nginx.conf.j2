@@ -52,7 +52,15 @@ http {
     server {
         listen      80;
         server_name {{ project_domain }};
-        return      301 https://$host$request_uri; # Redirect HTTP to HTTPS
+
+        ## Allow certbot challenge
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        location / {
+            return      301 https://$host$request_uri; # Redirect HTTP to HTTPS
+        }
     }
 
     server {
@@ -64,11 +72,7 @@ http {
         ssl_certificate_key /etc/letsencrypt/live/{{ project_domain }}/privkey.pem;
         ssl_protocols       TLSv1.2 TLSv1.3;
         ssl_ciphers         HIGH:!aNULL:!MD5;
-        ## Allow certbot challenge
-        location /.well-known/acme-challenge/ {
-            root /var/www/certbot;
-            allow all;
-        }
+
 
         # WordPress configuration
         # reverse proxy: https://developer.wordpress.org/advanced-administration/security/https/#using-a-reverse-proxy

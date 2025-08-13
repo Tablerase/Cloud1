@@ -21,7 +21,7 @@
 
 - name: Remove Certs files
   ansible.builtin.file:
-    path: "/etc/letsencrypt/live/{{ project_domain }}"
+    path: "/etc/letsencrypt"
     state: absent
   become: true
   register: cleanup_certs_files_result

@@ -1,5 +1,5 @@
 project_name: cloud1_project
-project_domain: rcutte.duckdns.org
+project_domain: rcutte-cloud.duckdns.org
 project_user: cloud1
 docker_compose_path: /opt/cloud1_project
 

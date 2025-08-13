@@ -56,7 +56,7 @@
     owner: "www-data"
     group: "www-data"
     mode: "0600"
-  # no_log: true
+  no_log: true
   tags:
     - wordpress
     - secrets
@@ -68,7 +68,7 @@
     owner: "www-data"
     group: "www-data"
     mode: "0600"
-  # no_log: true
+  no_log: true
   tags:
     - wordpress
     - secrets
@@ -87,30 +87,44 @@
     - nginx
     - templates
 
-- name: Create certs directory for bootstrap
-  ansible.builtin.file:
-    path: "/etc/letsencrypt/live/{{ project_domain }}"
-    state: directory
+- name: Copy Nginx init configuration file for certbot
+  ansible.builtin.template:
+    src: nginx-init-certbot.conf.j2
+    dest: "{{ docker_compose_path }}/nginx-init-certbot.conf"
     owner: "{{ project_user }}"
     group: "{{ project_user }}"
-    mode: "0755"
+    mode: "0644"
   become: true
+  register: wordpress_nginx_init_config_result
   tags:
     - wordpress
-    - certs
+    - nginx
+    - templates
 
-- name: Generate dummy self-signed certificate if none exists
-  ansible.builtin.command: >
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048
-      -keyout /etc/letsencrypt/live/{{ project_domain }}/privkey.pem
-      -out /etc/letsencrypt/live/{{ project_domain }}/fullchain.pem
-      -subj "/CN={{ project_domain }}"
-  args:
-    creates: "/etc/letsencrypt/live/{{ project_domain }}/fullchain.pem"
-  become: true
-  tags:
-    - wordpress
-    - certs
+# - name: Create certs directory for bootstrap
+#   ansible.builtin.file:
+#     path: "/etc/letsencrypt/live/{{ project_domain }}"
+#     state: directory
+#     owner: "{{ project_user }}"
+#     group: "{{ project_user }}"
+#     mode: "0755"
+#   become: true
+#   tags:
+#     - wordpress
+#     - certs
+
+# - name: Generate dummy self-signed certificate if none exists
+#   ansible.builtin.command: >
+#     openssl req -x509 -nodes -days 365 -newkey rsa:2048
+#       -keyout /etc/letsencrypt/live/{{ project_domain }}/privkey.pem
+#       -out /etc/letsencrypt/live/{{ project_domain }}/fullchain.pem
+#       -subj "/CN={{ project_domain }}"
+#   args:
+#     creates: "/etc/letsencrypt/live/{{ project_domain }}/fullchain.pem"
+#   become: true
+#   tags:
+#     - wordpress
+#     - certs
 
 - name: Start Docker Compose services
   community.docker.docker_compose_v2:
@@ -122,6 +136,60 @@
   tags:
     - wordpress
     - docker-compose
+
+- name: Wait for SSL certificates to be done
+  community.docker.docker_container_exec:
+    container: "{{ certbot_container_name }}"
+    command: "test -f /etc/letsencrypt/live/{{ project_domain }}/fullchain.pem"
+  become: true
+  register: wordpress_ssl_certificates_result
+  until: wordpress_ssl_certificates_result.rc == 0
+  retries: 10
+  delay: 30
+  tags:
+    - wordpress
+    - ssl
+    - certificates
+
+- name: Replace init certbot nginx conf with final version
+  community.docker.docker_container_exec:
+    container: "{{ nginx_container_name }}"
+    command: "cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak"
+  become: true
+  tags:
+    - wordpress
+    - ssl
+    - nginx
+
+- name: Copy final nginx conf over init version
+  community.docker.docker_container_exec:
+    container: "{{ nginx_container_name }}"
+    command: "cp /etc/nginx/nginx.conf.final /etc/nginx/nginx.conf"
+  become: true
+  tags:
+    - wordpress
+    - ssl
+    - nginx
+
+- name: Change nginx configuration to use SSL
+  community.docker.docker_container_exec:
+    container: "{{ nginx_container_name }}"
+    command: "nginx -s reload"
+  become: true
+  tags:
+    - wordpress
+    - ssl
+    - nginx
+
+- name: Add a cron job to reload Nginx
+  community.docker.docker_container_exec:
+    container: "{{ nginx_container_name }}"
+    command: "echo '0 */12 * * * root nginx -t && nginx -s reload' > /etc/cron.d/nginx-reload"
+  become: true
+  tags:
+    - wordpress
+    - ssl
+    - nginx
 
 - name: Wait for MySQL container to be healthy
   community.docker.docker_container_info:
