@@ -2,17 +2,22 @@
 
 *.retry
 *.log
-.ansible
+logs/
+.ansible/
 
 # Ignore Ansible Vault files
 *.vault
-*.vault_pass
+*.vault_pass*
+vault.yml
 
 # Ignore key files
 keys/
 *.pem
 *.key
 *.pub
+
+# Ignore inventory files with host details
+inventory/inventory.yml
 
 # Ignore Python virtual environments and logs
 __pycache__/
