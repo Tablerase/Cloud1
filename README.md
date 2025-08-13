@@ -208,7 +208,7 @@ flowchart TB
 
 ## Secrets and Ansible Vault
 
-Sensitive values are defined in `inventory/group_vars/all/vault.yml` and referenced in `inventory/group_vars/all.yml` as `vault_*` variables. Keep `vault.yml` encrypted with Ansible Vault.
+Sensitive values are defined in `inventory/group_vars/all/vault.yml` and referenced in `inventory/group_vars/all/all.yml` as `vault_*` variables. Keep `vault.yml` encrypted with Ansible Vault.
 
 - `ansible.cfg` is set with `vault_identity_list = default@.vault_pass.txt` so a local `.vault_pass.txt` can unlock the vault automatically (this file is gitignored).
 - Docker services use secrets with `_FILE` env vars; Ansible writes secret files to `{{ docker_compose_path }}/secrets` with `0600` permissions and `no_log: true`.
