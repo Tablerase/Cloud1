@@ -18,12 +18,11 @@
   register: cleanup_wordpress_project_files_result
   tags:
     - cleanup
-
-- name: Remove Certs files
-  ansible.builtin.file:
-    path: "/etc/letsencrypt"
-    state: absent
-  become: true
-  register: cleanup_certs_files_result
-  tags:
-    - cleanup
+# - name: Remove Certs files
+#   ansible.builtin.file:
+#     path: "/etc/letsencrypt"
+#     state: absent
+#   become: true
+#   register: cleanup_certs_files_result
+#   tags:
+#     - cleanup

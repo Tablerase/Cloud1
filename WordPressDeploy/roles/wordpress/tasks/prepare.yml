@@ -1,0 +1,22 @@
+---
+# Directories and prerequisite assertions
+- name: Create Docker Compose directory
+  ansible.builtin.file:
+    path: "{{ docker_compose_path }}"
+    state: directory
+    owner: "{{ project_user }}"
+    group: "{{ project_user }}"
+    mode: "0755"
+  become: true
+  register: wordpress_compose_dir_result
+  tags: [wordpress, directory, create]
+
+- name: Validate required secret variables are set
+  ansible.builtin.assert:
+    that:
+      - (mysql_root_password | default('')) | length > 0
+      - (mysql_password | default('')) | length > 0
+      - (wordpress_admin_password | default('')) | length > 0
+    fail_msg: "One or more required secrets are empty. Ensure vault variables are set and decrypted."
+    success_msg: "All required secrets are present."
+  tags: [wordpress, secrets, validate]

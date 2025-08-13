@@ -1,0 +1,158 @@
+---
+# WordPress content setup (home page + site icon)
+- name: Check if site icon is already set
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp option get site_icon --path=/var/www/html/wordpress
+    user: "www-data"
+  register: wordpress_site_icon_option
+  failed_when: false
+  changed_when: false
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]
+
+- name: Copy site icon to remote host temp (if provided)
+  ansible.builtin.copy:
+    src: "{{ wordpress_site_icon_src }}"
+    dest: "/tmp/icon.png"
+    mode: "0644"
+  when: (wordpress_site_icon_src | default('')) != '' and (wordpress_site_icon_option.stdout | trim) in ['', '0']
+  become: true
+  tags: [wordpress, wp-cli, content]
+
+- name: Copy site icon into WordPress container (docker cp)
+  ansible.builtin.command: >
+    docker cp /tmp/icon.png {{ wordpress_container_name }}:/tmp/icon.png
+  when: (wordpress_site_icon_src | default('')) != '' and (wordpress_site_icon_option.stdout | trim) in ['', '0']
+  changed_when: true
+  become: true
+  tags: [wordpress, wp-cli, content]
+
+- name: Import site icon into WordPress and get ID
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp media import /tmp/icon.png --title="Favicon" --alt="Site Favicon"
+      --porcelain --path=/var/www/html/wordpress
+    user: "www-data"
+  when: (wordpress_site_icon_src | default('')) != '' and (wordpress_site_icon_option.stdout | trim) in ['', '0']
+  register: wordpress_icon_import
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]
+
+- name: Set WordPress icon ID fact
+  ansible.builtin.set_fact:
+    wordpress_icon_id: "{{ wordpress_icon_import.stdout | trim }}"
+  when:
+    - (wordpress_site_icon_src | default('')) != ''
+    - (wordpress_site_icon_option.stdout | trim) in ['', '0']
+    - wordpress_icon_import.stdout is defined
+    - wordpress_icon_import.stdout | trim != ''
+  tags: [wordpress, wp-cli, content]
+
+- name: Set site icon option
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp option update site_icon "{{ wordpress_icon_id }}" --path=/var/www/html/wordpress
+    user: "www-data"
+  when:
+    - (wordpress_site_icon_src | default('')) != ''
+    - (wordpress_site_icon_option.stdout | trim) in ['', '0']
+    - wordpress_icon_id is defined
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]
+
+- name: Lookup existing Home page ID by slug
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc "wp post list --post_type=page --pagename=home --field=ID --path=/var/www/html/wordpress"
+    user: "www-data"
+  register: wordpress_home_lookup
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]
+
+- name: Create Home page if missing
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp post create
+        --post_type=page
+        --post_title='{{ wordpress_home_title }}'
+        --post_name=home
+        --post_status=publish
+        --porcelain
+        --path=/var/www/html/wordpress
+    user: "www-data"
+  when: (wordpress_home_lookup.stdout | trim) == ""
+  register: wordpress_home_create
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]
+
+- name: Determine Home page ID
+  ansible.builtin.set_fact:
+    wordpress_home_page_id: >-
+      {{ (wordpress_home_lookup.stdout | trim) if (wordpress_home_lookup.stdout | trim) != '' else (wordpress_home_create.stdout | trim) }}
+  tags: [wordpress, wp-cli, content]
+
+- name: Set home page content from file if specified
+  ansible.builtin.set_fact:
+    wordpress_home_content: "{{ lookup('file', wordpress_home_content_file) }}"
+  when: wordpress_home_content_file is defined and wordpress_home_content_file != ''
+
+- name: Update WordPress Home Page
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp post update {{ wordpress_home_page_id }} -
+      --allow-root
+      --path=/var/www/html/wordpress
+    stdin: "{{ wordpress_home_content }}"
+  when: wordpress_home_content is defined and wordpress_home_content | length > 0
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]
+
+- name: Set front page to display a static page
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp option update show_on_front page --path=/var/www/html/wordpress
+    user: "www-data"
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]
+
+- name: Set Home page as the front page
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      wp option update page_on_front {{ wordpress_home_page_id }} --path=/var/www/html/wordpress
+    user: "www-data"
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]
+
+# todo: fix image implementation - not working
+- name: Add featured image to home page
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc 'wp post meta update {{ wordpress_home_page_id }} _thumbnail_id "$icon_id" --path=/var/www/html/wordpress'
+    user: "www-data"
+  when:
+    - (wordpress_site_icon_src | default('')) != ''
+    - (wordpress_site_icon_option.stdout | trim) in ['', '0']
+    - (wordpress_home_page_id | default('')) != ''
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, content]

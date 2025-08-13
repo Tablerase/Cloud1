@@ -1,0 +1,31 @@
+---
+# WordPress core install
+- name: Check if WordPress is already installed
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: wp core is-installed --path=/var/www/html/wordpress
+    user: "www-data"
+  register: wordpress_is_installed
+  failed_when: false
+  changed_when: false
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, install]
+
+- name: Install WordPress
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: >
+      bash -lc "wp core install
+      --url=https://{{ project_domain }}/wordpress
+      --title='{{ project_name }}'
+      --admin_user='{{ wordpress_admin_user }}'
+      --admin_password='{{ wordpress_admin_password }}'
+      --admin_email='{{ wordpress_admin_email }}'
+      --path=/var/www/html/wordpress"
+    user: "www-data"
+  when: wordpress_is_installed.rc != 0
+  become: true
+  become_user: "{{ project_user }}"
+  no_log: true
+  tags: [wordpress, wp-cli, install]

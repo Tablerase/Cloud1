@@ -1,0 +1,40 @@
+---
+# SSL certificate readiness and nginx finalization
+- name: Wait for SSL certificates to be done
+  community.docker.docker_container_exec:
+    container: "{{ certbot_container_name }}"
+    command: "test -f /etc/letsencrypt/live/{{ project_domain }}/fullchain.pem"
+  become: true
+  register: wordpress_ssl_certificates_result
+  until: wordpress_ssl_certificates_result.rc == 0
+  retries: 10
+  delay: 30
+  tags: [wordpress, ssl, certificates]
+
+- name: Replace init certbot nginx conf with final version
+  community.docker.docker_container_exec:
+    container: "{{ nginx_container_name }}"
+    command: "cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak"
+  become: true
+  tags: [wordpress, ssl, nginx]
+
+- name: Copy final nginx conf over init version
+  community.docker.docker_container_exec:
+    container: "{{ nginx_container_name }}"
+    command: "cp /etc/nginx/nginx.conf.final /etc/nginx/nginx.conf"
+  become: true
+  tags: [wordpress, ssl, nginx]
+
+- name: Change nginx configuration to use SSL
+  community.docker.docker_container_exec:
+    container: "{{ nginx_container_name }}"
+    command: "nginx -s reload"
+  become: true
+  tags: [wordpress, ssl, nginx]
+
+- name: Add a cron job to reload Nginx
+  community.docker.docker_container_exec:
+    container: "{{ nginx_container_name }}"
+    command: "echo '0 */12 * * * root nginx -t && nginx -s reload' > /etc/cron.d/nginx-reload"
+  become: true
+  tags: [wordpress, ssl, nginx]

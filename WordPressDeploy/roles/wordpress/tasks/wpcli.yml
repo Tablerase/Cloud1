@@ -1,0 +1,45 @@
+---
+# WP-CLI setup
+- name: Fix permissions on subdirectory
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: chown -R www-data:www-data /var/www/html/wordpress
+  become: true
+  tags: [wordpress, wp-cli, permissions]
+
+- name: Check if WP-CLI is already installed
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: wp --version
+    user: "www-data"
+  register: wordpress_cli_check
+  failed_when: false
+  changed_when: false
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, check]
+
+- name: Install WP-CLI inside WordPress container
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+  when: wordpress_cli_check.rc != 0
+  tags: [wordpress, wp-cli, install]
+
+- name: Make WP-CLI executable
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: chmod +x wp-cli.phar
+  when: wordpress_cli_check.rc != 0
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, install]
+
+- name: Move WP-CLI to PATH
+  community.docker.docker_container_exec:
+    container: "{{ wordpress_container_name }}"
+    command: mv wp-cli.phar /usr/local/bin/wp
+  when: wordpress_cli_check.rc != 0
+  become: true
+  become_user: "{{ project_user }}"
+  tags: [wordpress, wp-cli, install]

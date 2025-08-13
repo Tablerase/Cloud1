@@ -1,0 +1,23 @@
+---
+# Nginx configuration templates
+- name: Copy Nginx configuration file
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ docker_compose_path }}/nginx.conf"
+    owner: "{{ project_user }}"
+    group: "{{ project_user }}"
+    mode: "0644"
+  become: true
+  register: wordpress_nginx_config_result
+  tags: [wordpress, nginx, templates]
+
+- name: Copy Nginx init configuration file for certbot
+  ansible.builtin.template:
+    src: nginx-init-certbot.conf.j2
+    dest: "{{ docker_compose_path }}/nginx-init-certbot.conf"
+    owner: "{{ project_user }}"
+    group: "{{ project_user }}"
+    mode: "0644"
+  become: true
+  register: wordpress_nginx_init_config_result
+  tags: [wordpress, nginx, templates]

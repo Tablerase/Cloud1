@@ -1,0 +1,10 @@
+---
+# Start docker compose project
+- name: Start Docker Compose services
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_compose_path }}"
+    state: present
+  become: true
+  become_user: "{{ project_user }}"
+  register: wordpress_compose_up_result
+  tags: [wordpress, docker-compose]

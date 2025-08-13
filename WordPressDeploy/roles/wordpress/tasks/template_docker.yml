@@ -1,0 +1,11 @@
+# docker-compose templating
+- name: Copy Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_compose_path }}/docker-compose.yml"
+    owner: "{{ project_user }}"
+    group: "{{ project_user }}"
+    mode: "0644"
+  become: true
+  register: wordpress_compose_file_result
+  tags: [wordpress, templates, docker-compose]

@@ -1,0 +1,35 @@
+---
+# Container health checks
+- name: Wait for MySQL container to be healthy
+  community.docker.docker_container_info:
+    name: "{{ mysql_container_name }}"
+  become: true
+  become_user: "{{ project_user }}"
+  register: wordpress_mysql_container_info
+  until: wordpress_mysql_container_info.container is defined and wordpress_mysql_container_info.container.State.Health.Status == "healthy"
+  retries: 10
+  delay: 30
+  tags: [wordpress, health-check]
+
+- name: Fail if MySQL container is not healthy
+  ansible.builtin.fail:
+    msg: "MySQL container {{ mysql_container_name }} failed health check or timed out"
+  when: not wordpress_mysql_container_info.container or wordpress_mysql_container_info.container.State.Health.Status != "healthy"
+  tags: [wordpress, health-check]
+
+- name: Wait for WordPress container to be healthy
+  community.docker.docker_container_info:
+    name: "{{ wordpress_container_name }}"
+  become: true
+  become_user: "{{ project_user }}"
+  register: wordpress_container_info
+  until: wordpress_container_info.container is defined and wordpress_container_info.container.State.Health.Status == "healthy"
+  retries: 10
+  delay: 30
+  tags: [wordpress, health-check]
+
+- name: Fail if WordPress container is not healthy
+  ansible.builtin.fail:
+    msg: "WordPress container {{ wordpress_container_name }} failed health check or timed out"
+  when: not wordpress_container_info.container or wordpress_container_info.container.State.Health.Status != "healthy"
+  tags: [wordpress, health-check]
