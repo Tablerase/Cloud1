@@ -18,7 +18,7 @@ wordpress_port: 80
 
 # Content configuration
 # Optional local path (relative to roles/wordpress/files/) to a favicon to set as site icon;
-wordpress_home_title: Home
+wordpress_home_title: Resume
 wordpress_home_content_file: home_page_content.html
 # Leave empty to skip
 wordpress_site_icon_src: site-icon-1024.png

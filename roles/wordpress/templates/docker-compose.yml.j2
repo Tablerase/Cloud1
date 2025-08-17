@@ -1,4 +1,6 @@
-# TODO: performance improvement with php-fpm-alpine if needed
+# TODO: possible improvement
+# performance improvement with php-fpm-alpine if needed
+# caching improvements with a custom image and caching plugins for WordPress (redis, memcached, etc.)
 services:
     # MySQL Database doc: https://hub.docker.com/_/mysql
     mysql:
@@ -123,7 +125,6 @@ services:
             - certbot_data:/var/www/certbot
             - ./logs/certbot:/var/log/letsencrypt
         entrypoint: ""
-        # TODO: Handle SSL certificate challenges and updates of nginx conf
         command: >
             sh -c "
                 # Prepare ACME challenge directory
